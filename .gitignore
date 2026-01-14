@@ -1,0 +1,23 @@
+# GeoServer / MapStore2 sistemski folderi
+bin/
+conf/
+jre/
+lib/
+logs/
+temp/
+webapps/
+work/
+
+# Izvršni fajlovi
+*.bat
+*.sh
+
+# Testni i privremeni podaci
+test_tile.png
+op_cir_sample.json
+op_cir_sample_utf8.json
+leaflet-proba.htm
+
+# IDE specifični fajlovi
+.vscode/
+.cursor/

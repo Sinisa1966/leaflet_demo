@@ -46,7 +46,10 @@
         <h3>GIS Kontrola (WFS)</h3>
         <p>Sada povlačimo <strong>prave vektore</strong>. Granice su interaktivne!</p>
         <div style="font-size: 12px;">
-            <span class="legend-color"></span> Granica opštine
+            <span class="legend-color"></span> Granica opštine (latinica)
+        </div>
+        <div style="font-size: 12px; margin-top: 4px;">
+            <span class="legend-color" style="border-color: #e67e22;"></span> Granica opštine (ćirilica)
         </div>
         <hr>
         <small>Kliknite na opštinu za detalje.</small>
@@ -69,8 +72,25 @@
         // 3. POVEZIVANJE NA WFS (GeoJSON format)
         // Dodajemo SRSName=EPSG:4326 da bi nam GeoServer vratio koordinate koje Leaflet razume
         var wfsUrl = "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:KatOp_Lat&outputFormat=application/json&srsName=EPSG:4326";
+        var wfsUrlCir = "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:Op_Cir&outputFormat=application/json&srsName=EPSG:4326&format_options=CHARSET:UTF-8";
 
-        // Funkcija za stilizaciju granica
+        // Brzi fix za mojibake u latinici (npr. KACABAÆ -> KACABAĆ)
+        function fixLatinMojibake(text) {
+            if (!text) return text;
+            var map = {
+                "Æ": "Ć",
+                "Ð": "Đ",
+                "È": "Č",
+                "æ": "ć",
+                "ð": "đ",
+                "è": "č"
+            };
+            return text.replace(/[ÆÐÈæðè]/g, function (ch) {
+                return map[ch] || ch;
+            });
+        }
+
+        // Funkcija za stilizaciju granica (latinica)
         function styleOpstina(feature) {
             return {
                 color: "#2ecc71",      // Boja granice (zelena)
@@ -80,11 +100,21 @@
             };
         }
 
+        // Stil za ćirilični sloj
+        function styleOpstinaCir(feature) {
+            return {
+                color: "#e67e22",      // Narandžasta
+                weight: 2,
+                fillOpacity: 0,
+                opacity: 0.8
+            };
+        }
+
         // Funkcija koja definiše šta se dešava sa svakim objektom (opštinom)
         function onEachFeature(feature, layer) {
             // Popup sa podacima iz baze (ImeKOLatV)
             if (feature.properties && feature.properties.ImeKOLatV) {
-                layer.bindPopup("<strong>Opština:</strong> " + feature.properties.ImeKOLatV);
+                layer.bindPopup("<strong>Opština:</strong> " + fixLatinMojibake(feature.properties.ImeKOLatV));
             }
 
             // Interakcija na miša (Hover efekat)
@@ -103,7 +133,29 @@
             });
         }
 
+        function onEachFeatureCir(feature, layer) {
+            var cirName = feature.properties && (feature.properties.ImeOV || feature.properties.ImeKOCirV || feature.properties.ImeKOCir || feature.properties.Naziv);
+            if (cirName) {
+                layer.bindPopup(cirName);
+            }
+
+            layer.on({
+                mouseover: function (e) {
+                    var l = e.target;
+                    l.setStyle({
+                        weight: 4,
+                        color: '#d35400',
+                        fillOpacity: 0.1
+                    });
+                },
+                mouseout: function (e) {
+                    mojVektorskiSlojCir.resetStyle(e.target);
+                }
+            });
+        }
+
         var mojVektorskiSloj;
+        var mojVektorskiSlojCir;
 
         // Fetch zahtev za podatke
         fetch(wfsUrl)
@@ -116,6 +168,8 @@
                     onEachFeature: onEachFeature
                 }).addTo(map);
 
+                layerControl.addOverlay(mojVektorskiSloj, "Opštine (latinica)");
+
                 // Automatsko zumiranje na sve podatke
                 map.fitBounds(mojVektorskiSloj.getBounds());
             })
@@ -124,9 +178,25 @@
                 alert("Greška: Proverite CORS podešavanja ili da li GeoServer radi.");
             });
 
+        fetch(wfsUrlCir)
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                mojVektorskiSlojCir = L.geoJSON(data, {
+                    style: styleOpstinaCir,
+                    onEachFeature: onEachFeatureCir
+                }).addTo(map);
+
+                layerControl.addOverlay(mojVektorskiSlojCir, "Opštine (ćirilica)");
+            })
+            .catch(function(error) {
+                console.error("Greška kod WFS zahteva (Op_Cir):", error);
+            });
+
         // 4. Kontrola slojeva
         var baseMaps = { "OpenStreetMap": osm };
-        L.control.layers(baseMaps).addTo(map);
+        var layerControl = L.control.layers(baseMaps).addTo(map);
 
         // 5. Skala
         L.control.scale().addTo(map);
