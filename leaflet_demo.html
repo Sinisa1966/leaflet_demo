@@ -74,21 +74,7 @@
         var wfsUrl = "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:KatOp_Lat&outputFormat=application/json&srsName=EPSG:4326";
         var wfsUrlCir = "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:Op_Cir&outputFormat=application/json&srsName=EPSG:4326&format_options=CHARSET:UTF-8";
 
-        // Brzi fix za mojibake u latinici (npr. KACABAÆ -> KACABAĆ)
-        function fixLatinMojibake(text) {
-            if (!text) return text;
-            var map = {
-                "Æ": "Ć",
-                "Ð": "Đ",
-                "È": "Č",
-                "æ": "ć",
-                "ð": "đ",
-                "è": "č"
-            };
-            return text.replace(/[ÆÐÈæðè]/g, function (ch) {
-                return map[ch] || ch;
-            });
-        }
+       
 
         // Funkcija za stilizaciju granica (latinica)
         function styleOpstina(feature) {
