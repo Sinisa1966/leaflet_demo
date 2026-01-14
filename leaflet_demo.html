@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaflet + GeoServer WFS (Vektori)</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            max-width: 250px;
+        }
+        h3 { margin-top: 0; font-size: 16px; }
+        p { font-size: 13px; color: #666; }
+        .legend-color {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #2ecc71;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <h3>GIS Kontrola (WFS)</h3>
+        <p>Sada povlačimo <strong>prave vektore</strong>. Granice su interaktivne!</p>
+        <div style="font-size: 12px;">
+            <span class="legend-color"></span> Granica opštine
+        </div>
+        <hr>
+        <small>Kliknite na opštinu za detalje.</small>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // 1. Inicijalizacija mape
+        var map = L.map('map').setView([44.01, 20.96], 7);
+
+        // 2. Osnovna podloga
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        // 3. POVEZIVANJE NA WFS (GeoJSON format)
+        // Dodajemo SRSName=EPSG:4326 da bi nam GeoServer vratio koordinate koje Leaflet razume
+        var wfsUrl = "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:KatOp_Lat&outputFormat=application/json&srsName=EPSG:4326";
+
+        // Funkcija za stilizaciju granica
+        function styleOpstina(feature) {
+            return {
+                color: "#2ecc71",      // Boja granice (zelena)
+                weight: 2,             // Debljina linije
+                fillOpacity: 0,        // PROZIRNO - bez boje unutra
+                opacity: 0.8
+            };
+        }
+
+        // Funkcija koja definiše šta se dešava sa svakim objektom (opštinom)
+        function onEachFeature(feature, layer) {
+            // Popup sa podacima iz baze (ImeKOLatV)
+            if (feature.properties && feature.properties.ImeKOLatV) {
+                layer.bindPopup("<strong>Opština:</strong> " + feature.properties.ImeKOLatV);
+            }
+
+            // Interakcija na miša (Hover efekat)
+            layer.on({
+                mouseover: function (e) {
+                    var l = e.target;
+                    l.setStyle({
+                        weight: 4,
+                        color: '#3498db', // Menja u plavu kad se pređe mišem
+                        fillOpacity: 0.1
+                    });
+                },
+                mouseout: function (e) {
+                    mojVektorskiSloj.resetStyle(e.target);
+                }
+            });
+        }
+
+        var mojVektorskiSloj;
+
+        // Fetch zahtev za podatke
+        fetch(wfsUrl)
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                mojVektorskiSloj = L.geoJSON(data, {
+                    style: styleOpstina,
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+
+                // Automatsko zumiranje na sve podatke
+                map.fitBounds(mojVektorskiSloj.getBounds());
+            })
+            .catch(function(error) {
+                console.error("Greška kod WFS zahteva:", error);
+                alert("Greška: Proverite CORS podešavanja ili da li GeoServer radi.");
+            });
+
+        // 4. Kontrola slojeva
+        var baseMaps = { "OpenStreetMap": osm };
+        L.control.layers(baseMaps).addTo(map);
+
+        // 5. Skala
+        L.control.scale().addTo(map);
+    </script>
+</body>
+</html>
