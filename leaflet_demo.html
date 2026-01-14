@@ -100,7 +100,7 @@
         function onEachFeature(feature, layer) {
             // Popup sa podacima iz baze (ImeKOLatV)
             if (feature.properties && feature.properties.ImeKOLatV) {
-                layer.bindPopup("<strong>Opština:</strong> " + fixLatinMojibake(feature.properties.ImeKOLatV));
+                layer.bindPopup("<strong>Opština:</strong> " + feature.properties.ImeKOLatV);
             }
 
             // Interakcija na miša (Hover efekat)
