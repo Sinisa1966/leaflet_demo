@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Data files (large CSV, TIFF, etc.)
+# Uncomment if you don't want to commit data files
+# *.csv
+# *.tif
+# *.tiff
+# *.geotiff
+
+# Docker
+docker-compose.override.yml
+
+# Node modules (if any)
+node_modules/
+
+# GeoServer data (if large)
+# geoserver_data/
+
+# Satellite data cache (optional - uncomment if too large)
+# satelite/*.tif
+# satelite/*.csv
+
+# But keep the structure
+!satelite/.gitkeep

@@ -1,0 +1,2944 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaflet + GeoServer WFS (Vektori)</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .controls {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 14px;
+            border-radius: 10px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+            max-width: 260px;
+            border: 1px solid #e6e6e6;
+        }
+        h3 { margin: 0 0 6px 0; font-size: 15px; }
+        p { font-size: 12px; color: #666; margin: 0 0 8px 0; }
+        .legend-color {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #2ecc71;
+            margin-right: 5px;
+        }
+        .legend-row {
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .controls hr {
+            border: 0;
+            border-top: 1px solid #eee;
+            margin: 8px 0;
+        }
+        .controls small {
+            color: #666;
+        }
+        .leaflet-control-layers {
+            border-radius: 10px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+            border: 1px solid #e6e6e6;
+        }
+        .leaflet-control-layers-expanded {
+            padding: 10px 12px;
+        }
+        .leaflet-control-layers label {
+            font-size: 12px;
+        }
+        .layer-group-title {
+            font-size: 12px;
+            font-weight: 600;
+            margin: 6px 0 4px;
+            color: #333;
+        }
+        .layer-group {
+            margin-top: 6px;
+        }
+        .meta-bar {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 8px 12px;
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+            border: 1px solid #e6e6e6;
+            font-size: 12px;
+            color: #333;
+            max-width: 85%;
+            text-align: left;
+            display: none;
+        }
+        .meta-bar div {
+            margin: 2px 0;
+            white-space: nowrap;
+        }
+        .parcel-search {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .parcel-search input {
+            flex: 1;
+            min-width: 140px;
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        .parcel-search button {
+            padding: 6px 10px;
+            border: 0;
+            border-radius: 6px;
+            background: #2c7be5;
+            color: #fff;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .parcel-search button:hover {
+            background: #1f66c0;
+        }
+        .opacity-control {
+            margin: 6px 0 4px;
+            font-size: 12px;
+            color: #444;
+        }
+        .opacity-control input[type="range"] {
+            width: 100%;
+        }
+        .auto-report {
+            margin-top: 10px;
+            padding: 8px 10px;
+            border: 1px solid #e6e6e6;
+            border-radius: 8px;
+            background: #fafafa;
+            font-size: 12px;
+            color: #333;
+        }
+        .auto-report strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+        .index-info {
+            position: absolute;
+            bottom: 48px;
+            left: 12px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 8px 12px;
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+            border: 1px solid #e6e6e6;
+            font-size: 12px;
+            color: #333;
+            max-width: 320px;
+            display: none;
+        }
+        .index-info strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+        .time-chart-container {
+            margin-top: 10px;
+            padding: 8px 10px;
+            border: 1px solid #e6e6e6;
+            border-radius: 8px;
+            background: #fafafa;
+            font-size: 12px;
+            display: none;
+        }
+        .time-chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+        .time-chart-header:hover {
+            color: #2c7be5;
+        }
+        .time-chart-header strong {
+            font-size: 13px;
+        }
+        .time-chart-controls {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .time-chart-controls button {
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #fff;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .time-chart-controls button:hover {
+            background: #f0f0f0;
+        }
+        .time-chart-controls button.active {
+            background: #2c7be5;
+            color: #fff;
+            border-color: #2c7be5;
+        }
+        .time-chart-wrapper {
+            position: relative;
+            height: 250px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- meta bar uklonjen po zahtevu -->
+    <!-- info-balon uklonjen po zahtevu -->
+
+    <div class="controls">
+        <h3>GIS Kontrola (WFS)</h3>
+        
+        <div class="opstina-select" style="margin-bottom: 10px;">
+            <label for="opstinaSelect" style="display: block; font-size: 12px; margin-bottom: 4px; color: #666;">Opština:</label>
+            <select id="opstinaSelect" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+                <option value="vrsac_dkp_pg">Vršac</option>
+                <option value="kovin_dkp_pg">Kovin</option>
+                <option value="pancevo_dkp_pg">Pančevo</option>
+            </select>
+        </div>
+        
+        <hr>
+        <div class="parcel-search">
+            <input id="parcelInput" type="text" list="parcelOptions" placeholder="Parcela npr. 25991" />
+            <datalist id="parcelOptions"></datalist>
+            <button id="parcelBtn" type="button">Nađi</button>
+        </div>
+        <small id="parcelStatus">Unesite broj parcele za detalje.</small>
+        <div id="autoReport" class="auto-report" style="display: none;"></div>
+        <div id="ndreZonesLegend" style="display: none; margin-top: 15px; padding: 10px; background: #f9f9f9; border-radius: 4px; border: 1px solid #ddd;">
+            <strong style="font-size: 12px; display: block; margin-bottom: 8px;">NDRE Zone:</strong>
+            <div style="font-size: 11px; line-height: 1.6;">
+                <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                    <div style="width: 20px; height: 15px; background: rgb(255, 0, 0); border: 1px solid #999; margin-right: 8px;"></div>
+                    <span>Najniži NDRE (0-33%) - problematična zona</span>
+                </div>
+                <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                    <div style="width: 20px; height: 15px; background: rgb(255, 255, 0); border: 1px solid #999; margin-right: 8px;"></div>
+                    <span>Srednji NDRE (33-66%) - umerena zona</span>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <div style="width: 20px; height: 15px; background: rgb(0, 255, 0); border: 1px solid #999; margin-right: 8px;"></div>
+                    <span>Najviši NDRE (66-100%) - dobra zona</span>
+                </div>
+            </div>
+        </div>
+        <div id="timeChartContainer" class="time-chart-container">
+            <div class="time-chart-header" onclick="toggleTimeChart()">
+                <strong>📈 Vremenski grafikon (godinu dana)</strong>
+                <span id="timeChartToggle">▼</span>
+            </div>
+            <div id="timeChartContent" style="display: none;">
+                <div class="time-chart-controls">
+                    <button onclick="setTimeRange(30)" class="time-range-btn" data-days="30">30 dana</button>
+                    <button onclick="setTimeRange(60)" class="time-range-btn" data-days="60">60 dana</button>
+                    <button onclick="setTimeRange(90)" class="time-range-btn" data-days="90">90 dana</button>
+                    <button onclick="setTimeRange(365)" class="time-range-btn active" data-days="365">Godinu dana</button>
+                </div>
+                <div class="time-chart-wrapper">
+                    <canvas id="timeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // 1. Inicijalizacija mape
+        var map = L.map('map').setView([44.01, 20.96], 7);
+        map.createPane('dkpPane');
+        map.getPane('dkpPane').style.zIndex = 650;
+        // NDVI pravougaonik (bbox) koji je već ubačen u GeoServer
+        var ndviBounds = L.latLngBounds(
+            [45.043304, 21.305597], // SW (lat, lon) - parcela 25991
+            [45.051479, 21.311765]  // NE (lat, lon)
+        );
+        map.fitBounds(ndviBounds);
+
+        // 2. Osnovna podloga
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+        var satellite = L.tileLayer(
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            {
+                attribution: 'Tiles &copy; Esri'
+            }
+        );
+
+        // 3. POVEZIVANJE NA WFS (GeoJSON format)
+        // Tražimo EPSG:4326 direktno iz GeoServera
+        var wfsUrl = "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:KatOp_Lat&outputFormat=application/json&srsName=EPSG:4326";
+        var wfsUrlCir = "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:Op_Cir&outputFormat=application/json&srsName=EPSG:4326&format_options=CHARSET:UTF-8";
+        var wfsUrlDkp = "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:vrsac_dkp_pg&outputFormat=application/json&srsName=EPSG:4326";
+        var wfsUrlKovin = "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:kovin_dkp_pg&outputFormat=application/json&srsName=EPSG:4326";
+        var wfsUrlPancevo = "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:pancevo_dkp_pg&outputFormat=application/json&srsName=EPSG:4326";
+        var wfsUrlPancevoAdrese = "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:pancevo_adrese&outputFormat=application/json&srsName=EPSG:4326";
+        var wfsUrlTamis = "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:tamis_ogledno_polje&outputFormat=application/json&srsName=EPSG:4326";
+        var wfsUrlTamis = "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:tamis_ogledno_polje&outputFormat=application/json&srsName=EPSG:4326";
+
+        var parcelHighlight;
+        var parcelSuggestTimer;
+        var opstineLatLayer;
+        var opstineCirLayer;
+        var dkpLayer;
+        var kovinLayer;
+        var pancevoLayer;
+        var pancevoAdreseLayer;
+        var tamisLayer;
+        var opstineLatLoaded = false;
+        var opstineCirLoaded = false;
+        var dkpLoaded = false;
+        var kovinLoaded = false;
+        var pancevoLoaded = false;
+        var pancevoAdreseLoaded = false;
+        var tamisLoaded = false;
+
+        function getSelectedOpstina() {
+            var select = document.getElementById("opstinaSelect");
+            return select ? select.value : "vrsac_dkp_pg";
+        }
+        
+        function buildParcelUrl(parcelId) {
+            var cql = "brparcele='" + parcelId + "'";
+            var layerName = getSelectedOpstina();
+            return "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:" + layerName + "&outputFormat=application/json&srsName=EPSG:4326&maxFeatures=1&CQL_FILTER=" + encodeURIComponent(cql);
+        }
+
+        function buildParcelSuggestUrl(prefix) {
+            var safe = prefix.replace(/'/g, "''");
+            var cql = "brparcele ILIKE '" + safe + "%'";
+            var layerName = getSelectedOpstina();
+            return "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:" + layerName + "&outputFormat=application/json&srsName=EPSG:4326&propertyName=brparcele&maxFeatures=12&CQL_FILTER=" + encodeURIComponent(cql);
+        }
+
+        function updateParcelOptions(values) {
+            var list = document.getElementById("parcelOptions");
+            list.innerHTML = "";
+            values.forEach(function(val) {
+                var opt = document.createElement("option");
+                opt.value = val;
+                list.appendChild(opt);
+            });
+        }
+
+        function suggestParcels(prefix) {
+            if (!prefix || prefix.length < 2) {
+                updateParcelOptions([]);
+                return;
+            }
+            fetch(buildParcelSuggestUrl(prefix))
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    var seen = {};
+                    var values = [];
+                    (data.features || []).forEach(function(f) {
+                        var v = f.properties && f.properties.brparcele;
+                        if (v && !seen[v]) {
+                            seen[v] = true;
+                            values.push(v);
+                        }
+                    });
+                    updateParcelOptions(values);
+                })
+                .catch(function(err) {
+                    console.error("Greška kod sugestija parcele:", err);
+                });
+        }
+
+        function buildParcelPrefixUrl(prefix) {
+            var safe = prefix.replace(/'/g, "''");
+            var cql = "brparcele ILIKE '" + safe + "%'";
+            var layerName = getSelectedOpstina();
+            return "http://localhost:8083/geoserver/moj_projekat/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=moj_projekat:" + layerName + "&outputFormat=application/json&srsName=EPSG:4326&maxFeatures=1&CQL_FILTER=" + encodeURIComponent(cql);
+        }
+
+        function zoomToParcel(parcelId) {
+            if (!parcelId) {
+                return;
+            }
+            var statusEl = document.getElementById("parcelStatus");
+            if (statusEl) {
+                statusEl.textContent = "Tražim parcelu " + parcelId + "...";
+            }
+            fetch(buildParcelUrl(parcelId))
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data && data.features && data.features.length) {
+                        if (parcelHighlight) {
+                            map.removeLayer(parcelHighlight);
+                        }
+                        parcelHighlight = L.geoJSON(data, {
+                            style: {
+                                color: "#1abc9c",
+                                weight: 3,
+                                fillOpacity: 0.1
+                            }
+                        }).addTo(map);
+                        map.fitBounds(parcelHighlight.getBounds());
+                    requestParcelNdvi(parcelId);
+                    requestParcelNdviCsv(parcelId);
+                    requestParcelNdmi(parcelId);
+                    requestParcelNdmiCsv(parcelId);
+                    requestParcelNdre(parcelId);
+                    requestParcelNdreCsv(parcelId);
+                    requestParcelNdreZones(parcelId); // Generiši i prikaži NDRE zone
+                    setCurrentParcel(parcelId);
+                        if (statusEl) {
+                            statusEl.textContent = "Parcela " + parcelId + " pronađena.";
+                        }
+                        return;
+                    }
+                    return fetch(buildParcelPrefixUrl(parcelId))
+                        .then(function(response) { return response.json(); })
+                        .then(function(prefixData) {
+                            if (!prefixData || !prefixData.features || !prefixData.features.length) {
+                                if (statusEl) {
+                                    statusEl.textContent = "Parcela није pronađena: " + parcelId;
+                                }
+                                alert("Parcela nije pronađena: " + parcelId);
+                                return;
+                            }
+                            if (parcelHighlight) {
+                                map.removeLayer(parcelHighlight);
+                            }
+                            parcelHighlight = L.geoJSON(prefixData, {
+                                style: {
+                                    color: "#1abc9c",
+                                    weight: 3,
+                                    fillOpacity: 0.1
+                                }
+                            }).addTo(map);
+                            map.fitBounds(parcelHighlight.getBounds());
+                            var feature = prefixData.features[0];
+                            var pid = feature.properties && feature.properties.brparcele ? feature.properties.brparcele : parcelId;
+                            requestParcelNdvi(pid);
+                            requestParcelNdviCsv(pid);
+                            requestParcelNdmi(pid);
+                            requestParcelNdmiCsv(pid);
+                            requestParcelNdre(pid);
+                            requestParcelNdreCsv(pid);
+                            requestParcelNdreZones(pid); // Generiši i prikaži NDRE zone
+                            setCurrentParcel(pid);
+                            if (statusEl) {
+                                statusEl.textContent = "Parcela " + pid + " pronađena.";
+                            }
+                        });
+                })
+                .catch(function(err) {
+                    if (statusEl) {
+                        statusEl.textContent = "Greška pri pretrazi parcele: " + parcelId + " (" + (err.message || err) + ")";
+                    }
+                    console.error("Greška kod pretrage parcele:", err);
+                });
+        }
+
+       
+
+        // Funkcija za stilizaciju granica (latinica)
+        function styleOpstina(feature) {
+            return {
+                color: "#2ecc71",      // Boja granice (zelena)
+                weight: 2,             // Debljina linije
+                fillOpacity: 0,        // PROZIRNO - bez boje unutra
+                opacity: 0.8
+            };
+        }
+
+        // Stil za ćirilični sloj
+        function styleOpstinaCir(feature) {
+            return {
+                color: "#e67e22",      // Narandžasta
+                weight: 2,
+                fillOpacity: 0,
+                opacity: 0.8
+            };
+        }
+
+        // Funkcija koja definiše šta se dešava sa svakim objektom (opštinom)
+        function onEachFeature(feature, layer) {
+            // Popup sa podacima iz baze (ImeKOLatV)
+            if (feature.properties && feature.properties.ImeKOLatV) {
+                layer.bindPopup("<strong>Kat. Opština:</strong> " + feature.properties.ImeKOLatV);
+            }
+
+            // Interakcija na miša (Hover efekat)
+            layer.on({
+                mouseover: function (e) {
+                    var l = e.target;
+                    l.setStyle({
+                        weight: 4,
+                        color: '#3498db', // Menja u plavu kad se pređe mišem
+                        fillOpacity: 0.1
+                    });
+                },
+                mouseout: function (e) {
+                    mojVektorskiSloj.resetStyle(e.target);
+                }
+            });
+        }
+
+        function onEachFeatureCir(feature, layer) {
+            var cirName = feature.properties && (feature.properties.ImeOV || feature.properties.ImeKOCirV || feature.properties.ImeKOCir || feature.properties.Naziv);
+            if (cirName) {
+                layer.bindPopup(cirName);
+            }
+
+            layer.on({
+                mouseover: function (e) {
+                    var l = e.target;
+                    l.setStyle({
+                        weight: 4,
+                        color: '#d35400',
+                        fillOpacity: 0.1
+                    });
+                },
+                mouseout: function (e) {
+                    mojVektorskiSlojCir.resetStyle(e.target);
+                }
+            });
+        }
+
+        function styleDkp(feature) {
+            return {
+                color: "#8e44ad",
+                weight: 1.5,
+                fillOpacity: 0.1,
+                opacity: 0.9
+            };
+        }
+
+        function onEachFeatureDkp(feature, layer) {
+            var props = feature.properties || {};
+            var parcela = props.brparcele || props.parcela_id || "n/a";
+            var pov = props.povrsina ? (props.povrsina + " m2") : "n/a";
+            var status = props.dkp_status || props.status_par || props.status || "n/a";
+            layer.bindPopup(
+                "<strong>DKP Vršac</strong><br>" +
+                "Parcela: " + parcela + "<br>" +
+                "Površina: " + pov + "<br>" +
+                "Status: " + status
+            );
+        }
+
+        // 4. Kontrola slojeva
+        var baseMaps = {
+            "OpenStreetMap": osm,
+            "Satelite": satellite
+        };
+        var layerControl = L.control.layers(baseMaps, null, { position: 'topleft' }).addTo(map);
+
+        opstineLatLayer = L.geoJSON(null, {
+            style: styleOpstina,
+            onEachFeature: onEachFeature
+        });
+        opstineCirLayer = L.geoJSON(null, {
+            style: styleOpstinaCir,
+            onEachFeature: onEachFeatureCir
+        });
+        dkpLayer = L.geoJSON(null, {
+            pane: 'dkpPane',
+            style: styleDkp,
+            onEachFeature: onEachFeatureDkp
+        });
+        kovinLayer = L.geoJSON(null, {
+            pane: 'dkpPane',
+            style: styleDkp,
+            onEachFeature: onEachFeatureDkp
+        });
+        pancevoLayer = L.geoJSON(null, {
+            pane: 'dkpPane',
+            style: styleDkp,
+            onEachFeature: onEachFeatureDkp
+        });
+        pancevoAdreseLayer = L.geoJSON(null, {
+            pane: 'dkpPane',
+            style: styleDkp,
+            onEachFeature: onEachFeatureDkp
+        });
+        
+        var tamisIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+        
+        tamisLayer = L.geoJSON(null, {
+            pointToLayer: function(feature, latlng) {
+                return L.marker(latlng, {icon: tamisIcon});
+            },
+            onEachFeature: function(feature, layer) {
+                var props = feature.properties || {};
+                var popupContent = "<strong>Tamis Ogledno Polje</strong><br>";
+                for (var key in props) {
+                    if (props.hasOwnProperty(key)) {
+                        popupContent += key + ": " + props[key] + "<br>";
+                    }
+                }
+                layer.bindPopup(popupContent);
+            }
+        });
+
+        layerControl.addOverlay(opstineLatLayer, "Opštine (latinica)");
+        layerControl.addOverlay(opstineCirLayer, "Opštine (ćirilica)");
+        layerControl.addOverlay(dkpLayer, "DKP-Vrsac");
+        layerControl.addOverlay(kovinLayer, "DKP-Kovin");
+        layerControl.addOverlay(pancevoLayer, "DKP-Pancevo");
+        layerControl.addOverlay(pancevoAdreseLayer, "Pancevo-adrese");
+        layerControl.addOverlay(tamisLayer, "Tamis Ogledno Polje");
+
+        function loadOpstineLat() {
+            if (opstineLatLoaded) return;
+            opstineLatLoaded = true;
+            fetch(wfsUrl)
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    opstineLatLayer.addData(data);
+                })
+                .catch(function(error) {
+                    console.error("Greška kod WFS zahteva:", error);
+                    alert("Greška: Proverite CORS podešavanja ili da li GeoServer radi.");
+                });
+        }
+
+        function loadOpstineCir() {
+            if (opstineCirLoaded) return;
+            opstineCirLoaded = true;
+            fetch(wfsUrlCir)
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    opstineCirLayer.addData(data);
+                })
+                .catch(function(error) {
+                    console.error("Greška kod WFS zahteva (Op_Cir):", error);
+                });
+        }
+
+        function loadDkp() {
+            if (dkpLoaded) return;
+            dkpLoaded = true;
+            var bounds = map.getBounds();
+            var bbox = bounds.getWest() + "," + bounds.getSouth() + "," + bounds.getEast() + "," + bounds.getNorth();
+            var wfsUrlDkpBbox = wfsUrlDkp + "&bbox=" + bbox;
+            fetch(wfsUrlDkpBbox)
+                .then(function(response) { 
+                    if (!response.ok) {
+                        throw new Error("HTTP " + response.status);
+                    }
+                    return response.json(); 
+                })
+                .then(function(data) {
+                    if (data.features && data.features.length > 0) {
+                        dkpLayer.addData(data);
+                        dkpLayer.bringToFront();
+                        console.log("Vršac učitano sa bbox:", data.features.length, "feature-a");
+                    }
+                    return fetch(wfsUrlDkp);
+                })
+                .then(function(response) {
+                    if (response && response.ok) {
+                        return response.json();
+                    }
+                    return null;
+                })
+                .then(function(data) {
+                    if (data && data.features && data.features.length > 0) {
+                        dkpLayer.addData(data);
+                        dkpLayer.bringToFront();
+                        console.log("Vršac učitano sve:", data.features.length, "feature-a");
+                    }
+                })
+                .catch(function(error) {
+                    console.error("Greška kod WFS zahteva (DKP-Vrsac):", error);
+                    fetch(wfsUrlDkp)
+                        .then(function(response) { return response.json(); })
+                        .then(function(data) {
+                            if (data.features && data.features.length > 0) {
+                                dkpLayer.addData(data);
+                                dkpLayer.bringToFront();
+                                console.log("Vršac učitano (fallback):", data.features.length, "feature-a");
+                            }
+                        })
+                        .catch(function(err) {
+                            console.error("Greška kod WFS zahteva (fallback):", err);
+                        });
+                });
+        }
+
+        function loadKovin() {
+            if (kovinLoaded) return;
+            kovinLoaded = true;
+            var bounds = map.getBounds();
+            var bbox = bounds.getWest() + "," + bounds.getSouth() + "," + bounds.getEast() + "," + bounds.getNorth();
+            var wfsUrlKovinBbox = wfsUrlKovin + "&bbox=" + bbox;
+            fetch(wfsUrlKovinBbox)
+                .then(function(response) { 
+                    if (!response.ok) {
+                        throw new Error("HTTP " + response.status);
+                    }
+                    return response.json(); 
+                })
+                .then(function(data) {
+                    if (data.features && data.features.length > 0) {
+                        kovinLayer.addData(data);
+                        kovinLayer.bringToFront();
+                        console.log("Kovin učitano sa bbox:", data.features.length, "feature-a");
+                    }
+                    return fetch(wfsUrlKovin);
+                })
+                .then(function(response) {
+                    if (response && response.ok) {
+                        return response.json();
+                    }
+                    return null;
+                })
+                .then(function(data) {
+                    if (data && data.features && data.features.length > 0) {
+                        kovinLayer.addData(data);
+                        kovinLayer.bringToFront();
+                        console.log("Kovin učitano sve:", data.features.length, "feature-a");
+                    }
+                })
+                .catch(function(error) {
+                    console.error("Greška kod WFS zahteva (DKP-Kovin):", error);
+                    fetch(wfsUrlKovin)
+                        .then(function(response) { return response.json(); })
+                        .then(function(data) {
+                            if (data.features && data.features.length > 0) {
+                                kovinLayer.addData(data);
+                                kovinLayer.bringToFront();
+                                console.log("Kovin učitano (fallback):", data.features.length, "feature-a");
+                            }
+                        })
+                        .catch(function(err) {
+                            console.error("Greška kod WFS zahteva (fallback):", err);
+                        });
+                });
+        }
+
+        function loadPancevo() {
+            if (pancevoLoaded) return;
+            pancevoLoaded = true;
+            var bounds = map.getBounds();
+            var bbox = bounds.getWest() + "," + bounds.getSouth() + "," + bounds.getEast() + "," + bounds.getNorth();
+            var wfsUrlPancevoBbox = wfsUrlPancevo + "&bbox=" + bbox;
+            fetch(wfsUrlPancevoBbox)
+                .then(function(response) { 
+                    if (!response.ok) {
+                        throw new Error("HTTP " + response.status);
+                    }
+                    return response.json(); 
+                })
+                .then(function(data) {
+                    if (data.features && data.features.length > 0) {
+                        pancevoLayer.addData(data);
+                        pancevoLayer.bringToFront();
+                        console.log("Pančevo učitano sa bbox:", data.features.length, "feature-a");
+                    }
+                    return fetch(wfsUrlPancevo);
+                })
+                .then(function(response) {
+                    if (response && response.ok) {
+                        return response.json();
+                    }
+                    return null;
+                })
+                .then(function(data) {
+                    if (data && data.features && data.features.length > 0) {
+                        pancevoLayer.addData(data);
+                        pancevoLayer.bringToFront();
+                        console.log("Pančevo učitano sve:", data.features.length, "feature-a");
+                    }
+                })
+                .catch(function(error) {
+                    console.error("Greška kod WFS zahteva (DKP-Pancevo):", error);
+                    fetch(wfsUrlPancevo)
+                        .then(function(response) { return response.json(); })
+                        .then(function(data) {
+                            if (data.features && data.features.length > 0) {
+                                pancevoLayer.addData(data);
+                                pancevoLayer.bringToFront();
+                                console.log("Pančevo učitano (fallback):", data.features.length, "feature-a");
+                            }
+                        })
+                        .catch(function(err) {
+                            console.error("Greška kod WFS zahteva (fallback):", err);
+                        });
+                });
+        }
+
+        function loadPancevoAdrese() {
+            if (pancevoAdreseLoaded) return;
+            pancevoAdreseLoaded = true;
+            var bounds = map.getBounds();
+            var bbox = bounds.getWest() + "," + bounds.getSouth() + "," + bounds.getEast() + "," + bounds.getNorth();
+            var wfsUrlPancevoAdreseBbox = wfsUrlPancevoAdrese + "&bbox=" + bbox;
+            fetch(wfsUrlPancevoAdreseBbox)
+                .then(function(response) { 
+                    if (!response.ok) {
+                        throw new Error("HTTP " + response.status);
+                    }
+                    return response.json(); 
+                })
+                .then(function(data) {
+                    if (data.features && data.features.length > 0) {
+                        pancevoAdreseLayer.addData(data);
+                        pancevoAdreseLayer.bringToFront();
+                        console.log("Pančevo-adrese učitano sa bbox:", data.features.length, "feature-a");
+                    }
+                    return fetch(wfsUrlPancevoAdrese);
+                })
+                .then(function(response) {
+                    if (response && response.ok) {
+                        return response.json();
+                    }
+                    return null;
+                })
+                .then(function(data) {
+                    if (data && data.features && data.features.length > 0) {
+                        pancevoAdreseLayer.addData(data);
+                        pancevoAdreseLayer.bringToFront();
+                        console.log("Pančevo-adrese učitano sve:", data.features.length, "feature-a");
+                    }
+                })
+                .catch(function(error) {
+                    console.error("Greška kod WFS zahteva (Pancevo-adrese):", error);
+                    fetch(wfsUrlPancevoAdrese)
+                        .then(function(response) { return response.json(); })
+                        .then(function(data) {
+                            if (data.features && data.features.length > 0) {
+                                pancevoAdreseLayer.addData(data);
+                                pancevoAdreseLayer.bringToFront();
+                                console.log("Pančevo-adrese učitano (fallback):", data.features.length, "feature-a");
+                            }
+                        })
+                        .catch(function(err) {
+                            console.error("Greška kod WFS zahteva (fallback):", err);
+                        });
+                });
+        }
+
+        // 4a. NDVI raster (WMS) iz GeoServera - dinamički za parcele
+        var ndviWms = L.tileLayer.wms('http://localhost:8083/geoserver/moj_projekat/wms', {
+            layers: 'moj_projekat:ndvi_parcela_25991',
+            format: 'image/png',
+            transparent: true,
+            styles: 'index_rgb_style',
+            attribution: 'Copernicus Sentinel-2 NDVI',
+            cacheBust: Date.now()
+        });
+        ndviWms.setOpacity(0.3); // Početna transparentnost 30%
+        ndviWms.addTo(map); // Dodaj na mapu po defaultu
+        
+        // NDMI raster za parcele
+        var ndmiParcelWms = L.tileLayer.wms('http://localhost:8083/geoserver/moj_projekat/wms', {
+            layers: 'moj_projekat:ndmi_parcela_25991',
+            format: 'image/png',
+            transparent: true,
+            styles: 'index_rgb_style',
+            attribution: 'Copernicus Sentinel-2 NDMI (parcela)',
+            cacheBust: Date.now()
+        });
+        ndmiParcelWms.setOpacity(0); // Početna transparentnost 0 (nevidljivo) - ne dodaje se na mapu po defaultu
+        
+        // NDRE raster za parcele
+        var ndreParcelWms = L.tileLayer.wms('http://localhost:8083/geoserver/moj_projekat/wms', {
+            layers: 'moj_projekat:ndre_parcela_25991',
+            format: 'image/png',
+            transparent: true,
+            styles: 'index_rgb_style',
+            attribution: 'Copernicus Sentinel-2 NDRE (parcela)',
+            cacheBust: Date.now()
+        });
+        ndreParcelWms.setOpacity(0); // Početna transparentnost 0 (nevidljivo) - ne dodaje se na mapu po defaultu
+        
+        // NDRE zones raster za parcele (najniži, srednji, najviši)
+        // Koristi postojeći NDRE raster sa gradient stilom koji mapira Red kanal na zelene nijanse
+        var ndreZonesParcelWms = L.tileLayer.wms('http://localhost:8083/geoserver/moj_projekat/wms', {
+            layers: 'moj_projekat:ndre_parcela_25991',
+            format: 'image/png',
+            transparent: true,
+            styles: 'ndre_gradient_style',
+            attribution: 'Copernicus Sentinel-2 NDRE Gradient (parcela)',
+            cacheBust: Date.now()
+        });
+        ndreZonesParcelWms.setOpacity(0); // Početna transparentnost 0 (nevidljivo) - ne dodaje se na mapu po defaultu
+        
+        // Dodaj slojeve za parcele u layerControl
+        layerControl.addOverlay(ndviWms, "NDVI (parcela)");
+        layerControl.addOverlay(ndmiParcelWms, "NDMI (parcela)");
+        layerControl.addOverlay(ndreParcelWms, "NDRE (parcela)");
+        layerControl.addOverlay(ndreZonesParcelWms, "NDRE Zone (parcela)");
+
+        var ndmiWms = L.tileLayer.wms('http://localhost:8083/geoserver/moj_projekat/wms', {
+            layers: 'moj_projekat:ndmi_srbija',
+            format: 'image/png',
+            transparent: true,
+            attribution: 'Copernicus Sentinel-2 NDMI'
+        });
+
+        var ndreWms = L.tileLayer.wms('http://localhost:8083/geoserver/moj_projekat/wms', {
+            layers: 'moj_projekat:ndre_srbija',
+            format: 'image/png',
+            transparent: true,
+            attribution: 'Copernicus Sentinel-2 NDRE'
+        });
+
+        var eviWms = L.tileLayer.wms('http://localhost:8083/geoserver/moj_projekat/wms', {
+            layers: 'moj_projekat:evi_srbija',
+            format: 'image/png',
+            transparent: true,
+            attribution: 'Copernicus Sentinel-2 EVI'
+        });
+
+        var droughtWms = L.tileLayer.wms('http://localhost:8083/geoserver/moj_projekat/wms', {
+            layers: 'moj_projekat:drought_zones',
+            format: 'image/png',
+            transparent: true,
+            attribution: 'Drought stress zones (NDMI)'
+        });
+
+
+        function normalizeOverlayOrder() {
+            var container = layerControl && layerControl._container;
+            if (!container) {
+                return;
+            }
+            var overlays = container.querySelector(".leaflet-control-layers-overlays");
+            if (!overlays) {
+                return;
+            }
+
+            function findLabelExact(text) {
+                var labels = overlays.querySelectorAll("label");
+                var match = null;
+                labels.forEach(function(label) {
+                    if (label.textContent && label.textContent.trim() === text) {
+                        match = label;
+                    }
+                });
+                return match;
+            }
+
+            function moveLabelAndSlider(labelText, sliderId) {
+                var label = findLabelExact(labelText);
+                if (!label) {
+                    return;
+                }
+                overlays.appendChild(label);
+                if (sliderId) {
+                    var slider = document.getElementById(sliderId);
+                    if (slider) {
+                        overlays.appendChild(slider.parentNode);
+                    }
+                }
+            }
+
+        }
+
+        // 5. Skala
+        L.control.scale().addTo(map);
+        
+        // 6. Merač (ruler) za merenje parcela - jednostavan custom ruler
+        var isMeasuring = false;
+        var measurePoints = [];
+        var measureLayer = L.layerGroup().addTo(map);
+        var measureLine = null;
+        var measurePolygon = null;
+        
+        var measureControl = L.control({
+            position: 'topleft'
+        });
+        
+        measureControl.onAdd = function(map) {
+            var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            div.innerHTML = '<a href="#" role="button" title="Meri dužinu/površinu" style="width:30px;height:30px;line-height:30px;display:block;text-align:center;text-decoration:none;font-weight:bold;font-size:18px;">📏</a>';
+            L.DomEvent.disableClickPropagation(div);
+            L.DomEvent.on(div, 'click', function(e) {
+                L.DomEvent.stopPropagation(e);
+                L.DomEvent.preventDefault(e);
+                if (!isMeasuring) {
+                    isMeasuring = true;
+                    measurePoints = [];
+                    measureLayer.clearLayers();
+                    map.on('click', measureOnClick);
+                    div.querySelector('a').style.backgroundColor = '#2c7be5';
+                    div.querySelector('a').style.color = '#fff';
+                } else {
+                    isMeasuring = false;
+                    map.off('click', measureOnClick);
+                    div.querySelector('a').style.backgroundColor = '';
+                    div.querySelector('a').style.color = '';
+                    if (measurePoints.length > 0) {
+                        measurePoints = [];
+                        measureLayer.clearLayers();
+                    }
+                }
+            });
+            return div;
+        };
+        
+        function measureOnClick(e) {
+            measurePoints.push(e.latlng);
+            
+            if (measurePoints.length === 1) {
+                // Prva tačka - marker
+                L.marker(e.latlng).addTo(measureLayer);
+            } else if (measurePoints.length === 2) {
+                // Druga tačka - linija
+                measureLine = L.polyline(measurePoints, {color: '#2c7be5', weight: 3}).addTo(measureLayer);
+                var distance = measurePoints[0].distanceTo(measurePoints[1]);
+                var popup = L.popup().setLatLng(e.latlng).setContent('Dužina: ' + distance.toFixed(2) + ' m (' + (distance/1000).toFixed(3) + ' km)').openOn(map);
+            } else {
+                // Više tačaka - poligon
+                if (measureLine) {
+                    measureLayer.removeLayer(measureLine);
+                    measureLine = null;
+                }
+                measurePolygon = L.polygon(measurePoints, {color: '#2c7be5', weight: 3, fillOpacity: 0.3}).addTo(measureLayer);
+                var area = L.GeometryUtil.geodesicArea(measurePoints);
+                var popup = L.popup().setLatLng(e.latlng).setContent('Površina: ' + area.toFixed(2) + ' m² (' + (area/10000).toFixed(3) + ' ha)').openOn(map);
+            }
+        }
+        
+        // Helper za izračunavanje površine
+        L.GeometryUtil = {
+            geodesicArea: function(latlngs) {
+                var area = 0;
+                for (var i = 0; i < latlngs.length; i++) {
+                    var j = (i + 1) % latlngs.length;
+                    area += latlngs[i].lng * latlngs[j].lat;
+                    area -= latlngs[j].lng * latlngs[i].lat;
+                }
+                area = Math.abs(area) * 111320 * 111320 / 2;
+                return area;
+            }
+        };
+        
+        measureControl.addTo(map);
+
+        // 6. Dinamički datum snimaka
+        (function updateMetadata() {
+            var metaBar = document.getElementById("metaBar");
+            if (!metaBar) {
+                return;
+            }
+            var metaUrl = "ndvi_auto/latest_metadata.json?ts=" + Date.now();
+            fetch(metaUrl)
+                .then(function(response) { return response.json(); })
+                .then(function(meta) {
+                    function line(label, data) {
+                        if (!data || !data.from || !data.to) {
+                            return label + ": n/a";
+                        }
+                        var fb = data.fallback ? " (fallback)" : "";
+                        return label + ": " + data.from + " → " + data.to + fb;
+                    }
+                    var html = [
+                        "<div><strong>Satelitski snimci</strong></div>",
+                        "<div>" + line("NDVI", meta.ndvi) + "</div>",
+                        "<div>" + line("NDMI", meta.ndmi) + "</div>",
+                        "<div>" + line("NDRE", meta.ndre) + "</div>",
+                        "<div>" + line("EVI", meta.evi) + "</div>",
+                        "<div>" + line("Suša", meta.drought) + "</div>"
+                    ].join("");
+                    metaBar.innerHTML = html;
+                    metaBar.style.display = "block";
+                })
+                .catch(function() {
+                    metaBar.style.display = "none";
+                });
+        })();
+
+        function toNumber(value) {
+            var n = Number(value);
+            return Number.isFinite(n) ? n : null;
+        }
+        function parseCsv(text) {
+            if (!text || !text.trim()) {
+                return [];
+            }
+            var lines = text.trim().split(/\r?\n/);
+            if (lines.length < 2) {
+                return [];
+            }
+            var headers = lines[0].split(",").map(function(h) { return h.trim(); });
+            return lines.slice(1).filter(function(line) {
+                return line.trim().length > 0; // Filtriraj prazne redove
+            }).map(function(line) {
+                var cols = line.split(",");
+                var row = {};
+                headers.forEach(function(key, idx) {
+                    row[key] = cols[idx] !== undefined ? cols[idx].trim() : "";
+                });
+                return row;
+            });
+        }
+        function pickLatestGood(rows) {
+            var good = rows.filter(function(row) {
+                var cloud = toNumber(row["C0/cloudCoveragePercent"]);
+                return cloud === null ? true : cloud < 80;
+            });
+            if (!good.length) {
+                return null;
+            }
+            good.sort(function(a, b) {
+                return new Date(a["C0/date"]).getTime() - new Date(b["C0/date"]).getTime();
+            });
+            // Pronađi prethodni validan podatak (ne prvi u intervalu)
+            var latest = good[good.length - 1];
+            var previous = good.length > 1 ? good[good.length - 2] : null;
+            return { 
+                first: good[0], 
+                latest: latest,
+                previous: previous,  // Prethodni validan podatak
+                validCount: good.length,
+                totalCount: rows.length
+            };
+        }
+        function trendText(firstVal, lastVal) {
+            if (firstVal === null || lastVal === null) {
+                return "n/a";
+            }
+            var diff = lastVal - firstVal;
+            if (Math.abs(diff) < 0.03) {
+                return "stabilno";
+            }
+            return diff > 0 ? "u porastu" : "u padu";
+        }
+        function extractPeriodFromPath(path) {
+            var match = path.match(/NDVI-([0-9-:TZ_.]+)-([0-9-:TZ_.]+)\.csv/i);
+            if (!match) {
+                return null;
+            }
+            return match[1].replace(/_/g, ":") + " → " + match[2].replace(/_/g, ":");
+        }
+        var currentParcelId = null;
+        var lastCsvError = null;
+        var timeChart = null;
+        var currentTimeRange = 365; // dani
+        var allCsvData = {}; // {NDVI: [...], NDMI: [...], NDRE: [...]}
+        function setCurrentParcel(parcelId) {
+            currentParcelId = parcelId;
+            allCsvData = {}; // Resetuj podatke
+            // Prikaži auto-report odmah sa porukom da se čeka CSV
+            var reportEl = document.getElementById("autoReport");
+            if (reportEl) {
+                reportEl.innerHTML = "<div><strong>Auto-izveštaj</strong><br>Parcela: " + parcelId + "<br>Čekam CSV fajlove...</div>";
+                reportEl.style.display = "block";
+            }
+            // Sakrij grafikon dok se ne učitaju podaci
+            var chartContainer = document.getElementById("timeChartContainer");
+            if (chartContainer) {
+                chartContainer.style.display = "none";
+            }
+            // Pozovi buildAutoReport() odmah da se prikaže trenutno stanje
+            // Ažuriraće se automatski kada waitForParcelCsv() pronađe CSV
+            buildAutoReport();
+        }
+        function buildParcelCsvCandidates(parcelId, kind, indexName) {
+            var base = "satelite/";
+            var list = [];
+            if (!parcelId) {
+                return list;
+            }
+            var safeId = parcelId.replace(/\//g, "_").replace(/\\/g, "_");
+            var index = indexName || "NDVI";
+            var indexLower = index.toLowerCase();
+            list.push(base + "parcela_" + safeId + "_" + index + ".csv");
+            list.push(base + "parcel_" + safeId + "_" + index + ".csv");
+            list.push(base + indexLower + "_parcela_" + safeId + ".csv");
+            list.push(base + safeId + "_" + index + ".csv");
+            if (kind === "point") {
+                list.push(base + "point_" + safeId + "_" + index + ".csv");
+                list.push(base + "tacka_" + safeId + "_" + index + ".csv");
+            }
+            return list;
+        }
+        function withCacheBust(path) {
+            var sep = path.indexOf("?") === -1 ? "?" : "&";
+            return path + sep + "ts=" + Date.now();
+        }
+        function fetchFirstCsv(paths) {
+            var index = 0;
+            function next() {
+                if (index >= paths.length) {
+                    return Promise.reject(new Error("not found"));
+                }
+                var path = paths[index++];
+                return fetch(encodeURI(withCacheBust(path)))
+                    .then(function(resp) {
+                        if (!resp.ok) {
+                            throw new Error("not found");
+                        }
+                        return resp.text().then(function(text) {
+                            return { path: path, text: text };
+                        });
+                    })
+                    .catch(next);
+            }
+            return next();
+        }
+        function buildAutoReport() {
+            var reportEl = document.getElementById("autoReport");
+            var parcelId = currentParcelId || document.getElementById("parcelInput").value.trim();
+            var sources = [];
+            if (parcelId) {
+                sources = [
+                    { label: "Parcela NDVI (zona)", index: "NDVI", candidates: buildParcelCsvCandidates(parcelId, "parcel", "NDVI") },
+                    { label: "Parcela NDMI (zona)", index: "NDMI", candidates: buildParcelCsvCandidates(parcelId, "parcel", "NDMI") },
+                    { label: "Parcela NDRE (zona)", index: "NDRE", candidates: buildParcelCsvCandidates(parcelId, "parcel", "NDRE") }
+                ];
+            } else {
+                sources = [
+                    { label: "Parcela NDVI (zona)", index: "NDVI", candidates: ["satelite/SSentinel-2 L2A-3_NDVI-2025-08-02T00_00_00.000Z-2025-09-02T23_59_59.999Z.csv"] },
+                    { label: "Tačka NDVI (centar)", index: "NDVI", candidates: ["satelite/Sentinel-2 L2A-3_NDVI-2025-08-02T00_00_00.000Z-2025-09-02T23_59_59.999Z.csv"] }
+                ];
+            }
+            var blocks = [];
+            var pending = sources.length;
+            sources.forEach(function(src) {
+                fetchFirstCsv(src.candidates || [])
+                    .then(function(result) {
+                        var rows = parseCsv(result.text);
+                        
+                        // Sačuvaj podatke za grafikon
+                        if (parcelId && rows.length > 0) {
+                            allCsvData[src.index] = rows.map(function(row) {
+                                return {
+                                    date: row["C0/date"],
+                                    mean: toNumber(row["C0/mean"]),
+                                    min: toNumber(row["C0/min"]),
+                                    max: toNumber(row["C0/max"]),
+                                    median: toNumber(row["C0/median"]),
+                                    cloud: toNumber(row["C0/cloudCoveragePercent"])
+                                };
+                            }).filter(function(row) {
+                                return row.date && row.mean !== null;
+                            });
+                        }
+                        
+                        var idxLabel = src.index || "NDVI";
+                        var picked = pickLatestGood(rows);
+                        var latest, previous, mean, median, p10, p90, min, max, previousMean, latestDate, period;
+                        var textParts = [];
+                        
+                        if (parcelId) {
+                            textParts.push("Parcela: " + parcelId);
+                        }
+                        
+                        // Za NDMI i NDRE - originalna logika (prikaži SVE podatke iz CSV-a)
+                        if (idxLabel !== "NDVI") {
+                            textParts.push("Ukupno podataka u CSV: " + rows.length);
+                            textParts.push("---");
+                            
+                            // Sortiraj sve podatke od najnovijeg ka starijim (bez filtriranja po cloud coverage)
+                            var allRows = rows.filter(function(row) {
+                                return row["C0/date"] && toNumber(row["C0/mean"]) !== null;
+                            });
+                            
+                            // Sortiraj od najnovijeg ka starijim
+                            allRows.sort(function(a, b) {
+                                return new Date(b["C0/date"]).getTime() - new Date(a["C0/date"]).getTime();
+                            });
+                            
+                            if (allRows.length > 0) {
+                                textParts.push("<strong>Svi podaci (od najnovijeg ka starijim):</strong>");
+                                allRows.forEach(function(row, idx) {
+                                    var rowDate = row["C0/date"];
+                                    var rowMean = toNumber(row["C0/mean"]);
+                                    var rowMedian = toNumber(row["C0/median"]);
+                                    var rowMin = toNumber(row["C0/min"]);
+                                    var rowMax = toNumber(row["C0/max"]);
+                                    var rowP10 = toNumber(row["C0/p10"]);
+                                    var rowP90 = toNumber(row["C0/p90"]);
+                                    
+                                    if (rowMean !== null) {
+                                        var interpretation = "";
+                                        if (idxLabel === "NDMI") {
+                                            interpretation = interpretNdmi(rowMean);
+                                        } else if (idxLabel === "NDRE") {
+                                            interpretation = interpretNdre(rowMean);
+                                        }
+                                        
+                                        var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
+                                        var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
+                                        
+                                        textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
+                                        textParts.push("   " + idxLabel + " Mean: " + rowMean.toFixed(3) + " (" + interpretation + ")");
+                                        if (rowMedian !== null) {
+                                            textParts.push("   Median: " + rowMedian.toFixed(3));
+                                        }
+                                        if (rowMin !== null && rowMax !== null) {
+                                            textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
+                                            // Za NDRE, prikaži zone
+                                            if (idxLabel === "NDRE") {
+                                                textParts.push("   Min zone: " + getNdreZone(rowMin) + ", Max zone: " + getNdreZone(rowMax));
+                                                textParts.push("   Raspon: " + (rowMax - rowMin).toFixed(3));
+                                            }
+                                        }
+                                        if (rowP10 !== null && rowP90 !== null) {
+                                            textParts.push("   p10/p90: " + rowP10.toFixed(3) + " / " + rowP90.toFixed(3));
+                                        }
+                                        textParts.push(""); // Prazan red između podataka
+                                    }
+                                });
+                            } else {
+                                textParts.push("CSV fajl je prazan (nema podataka).");
+                                textParts.push("Mogući razlozi: nema snimaka u poslednjih 60 dana, parcela je van područja pokrivenosti Sentinel-2 satelita, ili greška pri preuzimanju podataka.");
+                            }
+                            blocks.push("<div><strong>" + src.label + "</strong><br>" + textParts.join("<br>") + "</div>");
+                            return;
+                        }
+                        
+                        // Za NDVI - posebna logika
+                        if (!picked) {
+                            textParts.push("Ukupno podataka u CSV: " + rows.length);
+                            textParts.push("---");
+                            
+                            // Sortiraj sve validne podatke od najnovijeg ka starijim
+                            var allGoodRows = rows.filter(function(row) {
+                                return row["C0/date"] && toNumber(row["C0/mean"]) !== null;
+                            });
+                            
+                            // Sortiraj od najnovijeg ka starijim
+                            allGoodRows.sort(function(a, b) {
+                                return new Date(b["C0/date"]).getTime() - new Date(a["C0/date"]).getTime();
+                            });
+                            
+                            if (allGoodRows.length > 0) {
+                                textParts.push("<strong>Svi podaci (od najnovijeg ka starijim):</strong>");
+                                allGoodRows.forEach(function(row, idx) {
+                                    var rowDate = row["C0/date"];
+                                    var rowMean = toNumber(row["C0/mean"]);
+                                    var rowMedian = toNumber(row["C0/median"]);
+                                    var rowMin = toNumber(row["C0/min"]);
+                                    var rowMax = toNumber(row["C0/max"]);
+                                    var rowSampleCount = toNumber(row["C0/sampleCount"]);
+                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]);
+                                    
+                                    if (rowMean !== null) {
+                                        var interpretation = interpretNdvi(rowMean);
+                                        var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
+                                        var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
+                                        
+                                        textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
+                                        textParts.push("   NDVI Mean: " + rowMean.toFixed(3) + " (" + interpretation + ")");
+                                        if (rowMedian !== null) {
+                                            textParts.push("   Median: " + rowMedian.toFixed(3));
+                                        }
+                                        if (rowMin !== null && rowMax !== null) {
+                                            textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
+                                        }
+                                        if (rowSampleCount !== null) {
+                                            textParts.push("   SampleCount: " + rowSampleCount);
+                                        }
+                                        if (rowNoDataCount !== null) {
+                                            textParts.push("   NoDataCount: " + rowNoDataCount);
+                                        }
+                                        textParts.push(""); // Prazan red između podataka
+                                    }
+                                });
+                            } else {
+                                textParts.push("CSV fajl je prazan (nema podataka).");
+                            }
+                            blocks.push("<div><strong>" + src.label + "</strong><br>" + textParts.join("<br>") + "</div>");
+                            return;
+                        }
+                        
+                        latest = picked.latest;
+                        previous = picked.previous;
+                        mean = toNumber(latest["C0/mean"]);
+                        median = toNumber(latest["C0/median"]);
+                        p10 = toNumber(latest["C0/p10"]);
+                        p90 = toNumber(latest["C0/p90"]);
+                        min = toNumber(latest["C0/min"]);
+                        max = toNumber(latest["C0/max"]);
+                        previousMean = previous ? toNumber(previous["C0/mean"]) : null;
+                        latestDate = latest["C0/date"];
+                        period = extractPeriodFromPath(result.path);
+                        textParts = [];
+                        if (parcelId) {
+                            textParts.push("Parcela: " + parcelId);
+                        }
+                        // Prikaži ukupan broj podataka i broj validnih
+                        var totalRows = picked.totalCount || rows.length;
+                        var validRows = picked.validCount || 0;
+                        textParts.push("Ukupno podataka u CSV: " + totalRows + " (validnih: " + validRows + ")");
+                        textParts.push("---");
+                        
+                        // Za NDVI prikaži sve podatke
+                        if (idxLabel === "NDVI") {
+                            // Sortiraj sve validne podatke od najnovijeg ka starijim
+                            var allGoodRows = rows.filter(function(row) {
+                                var cloud = toNumber(row["C0/cloudCoveragePercent"]);
+                                return cloud === null ? true : cloud < 80;
+                            }).filter(function(row) {
+                                return row["C0/date"] && toNumber(row["C0/mean"]) !== null;
+                            });
+                            
+                            // Sortiraj od najnovijeg ka starijim
+                            allGoodRows.sort(function(a, b) {
+                                return new Date(b["C0/date"]).getTime() - new Date(a["C0/date"]).getTime();
+                            });
+                            
+                            if (allGoodRows.length > 0) {
+                                textParts.push("<strong>Svi podaci (od najnovijeg ka starijim):</strong>");
+                                allGoodRows.forEach(function(row, idx) {
+                                    var rowDate = row["C0/date"];
+                                    var rowMean = toNumber(row["C0/mean"]);
+                                    var rowMedian = toNumber(row["C0/median"]);
+                                    var rowMin = toNumber(row["C0/min"]);
+                                    var rowMax = toNumber(row["C0/max"]);
+                                    var rowSampleCount = toNumber(row["C0/sampleCount"]);
+                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]);
+                                    
+                                    if (rowMean !== null) {
+                                        var interpretation = interpretNdvi(rowMean);
+                                        var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
+                                        var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
+                                        
+                                        textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
+                                        textParts.push("   NDVI Mean: " + rowMean.toFixed(3) + " (" + interpretation + ")");
+                                        if (rowMedian !== null) {
+                                            textParts.push("   Median: " + rowMedian.toFixed(3));
+                                        }
+                                        if (rowMin !== null && rowMax !== null) {
+                                            textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
+                                        }
+                                        if (rowSampleCount !== null) {
+                                            textParts.push("   SampleCount: " + rowSampleCount);
+                                        }
+                                        if (rowNoDataCount !== null) {
+                                            textParts.push("   NoDataCount: " + rowNoDataCount);
+                                        }
+                                        textParts.push(""); // Prazan red između podataka
+                                    }
+                                });
+                            } else {
+                                // Fallback ako nema podataka
+                                textParts.push("<strong>Najnoviji validan podatak:</strong>");
+                                textParts.push("Snimak: " + latestDate);
+                                if (period) {
+                                    textParts.push("Period fajla: " + period);
+                                }
+                                if (mean !== null) {
+                                    textParts.push("NDVI mean: " + mean.toFixed(3) + " (" + interpretNdvi(mean) + ")");
+                                }
+                                if (median !== null) {
+                                    textParts.push("median: " + median.toFixed(3));
+                                }
+                                if (p10 !== null && p90 !== null) {
+                                    textParts.push("p10/p90: " + p10.toFixed(3) + " / " + p90.toFixed(3));
+                                }
+                                textParts.push("Trend: " + trendText(previousMean, mean));
+                            }
+                        } else {
+                            // Za NDMI i NDRE - originalna logika (samo najnoviji podatak)
+                            textParts.push("<strong>Najnoviji validan podatak:</strong>");
+                            textParts.push("Snimak: " + latestDate);
+                            if (period) {
+                                textParts.push("Period fajla: " + period);
+                            }
+                            if (mean !== null) {
+                                var interpretation = "";
+                                if (idxLabel === "NDMI") {
+                                    interpretation = interpretNdmi(mean);
+                                } else if (idxLabel === "NDRE") {
+                                    interpretation = interpretNdre(mean);
+                                }
+                                textParts.push(idxLabel + " mean: " + mean.toFixed(3) + " (" + interpretation + ")");
+                            }
+                            // Za NDRE, prikaži min, max i zone
+                            if (idxLabel === "NDRE") {
+                                if (min !== null && max !== null) {
+                                    textParts.push("Min: " + min.toFixed(3) + " (" + getNdreZone(min) + ")");
+                                    textParts.push("Max: " + max.toFixed(3) + " (" + getNdreZone(max) + ")");
+                                    textParts.push("Raspon: " + (max - min).toFixed(3));
+                                }
+                            }
+                            if (median !== null) {
+                                textParts.push("median: " + median.toFixed(3));
+                            }
+                            if (p10 !== null && p90 !== null) {
+                                textParts.push("p10/p90: " + p10.toFixed(3) + " / " + p90.toFixed(3));
+                            }
+                            // Trend u odnosu na prethodni datum (ne prvi u intervalu)
+                            textParts.push("Trend: " + trendText(previousMean, mean));
+                        }
+                        blocks.push("<div><strong>" + src.label + "</strong><br>" + textParts.join("<br>") + "</div>");
+                    })
+                    .catch(function() {
+                        if (parcelId) {
+                            var expected = (src.candidates || []).map(function(p) {
+                                return p.replace("satelite/", "");
+                            });
+                            var errorLine = lastCsvError ? "<br>Greška: " + lastCsvError : "";
+                            blocks.push("<div><strong>" + src.label + "</strong>Nema CSV za parcelu " + parcelId + ".<br>Očekujem: " + expected.join(", ") + errorLine + "</div>");
+                        }
+                    })
+                    .finally(function() {
+                        pending -= 1;
+                        if (pending === 0) {
+                            if (blocks.length) {
+                                reportEl.innerHTML = blocks.join("<hr>");
+                            } else {
+                                reportEl.innerHTML = "<div><strong>Auto-izveštaj</strong>Nema CSV fajlova za prikaz.</div>";
+                            }
+                            reportEl.style.display = "block";
+                            
+                            // Prikaži grafikon ako ima podataka
+                            if (parcelId && Object.keys(allCsvData).length > 0) {
+                                var chartContainer = document.getElementById("timeChartContainer");
+                                if (chartContainer) {
+                                    chartContainer.style.display = "block";
+                                    if (timeChart === null) {
+                                        updateTimeChart();
+                                    } else {
+                                        updateTimeChart();
+                                    }
+                                }
+                            } else {
+                                var chartContainer = document.getElementById("timeChartContainer");
+                                if (chartContainer) {
+                                    chartContainer.style.display = "none";
+                                }
+                            }
+                        }
+                    });
+            });
+        }
+        setTimeout(buildAutoReport, 0);
+
+        var indexInfo = document.getElementById("indexInfo");
+        function showIndexInfo(html) {
+            if (!indexInfo) {
+                return;
+            }
+            indexInfo.innerHTML = html;
+            indexInfo.style.display = "block";
+        }
+        function getActiveIndexLayer() {
+            if (map.hasLayer(ndreZonesParcelWms) && ndreZonesParcelWms.getOpacity() > 0) {
+                return { layer: ndreParcelWms, label: "NDRE", isZones: true };
+            }
+            if (map.hasLayer(ndreParcelWms) && ndreParcelWms.getOpacity() > 0) {
+                return { layer: ndreParcelWms, label: "NDRE" };
+            }
+            if (map.hasLayer(ndviWms)) {
+                return { layer: ndviWms, label: "NDVI" };
+            }
+            return null;
+        }
+        function getNdreZone(value) {
+            if (value === null || Number.isNaN(value)) {
+                return "nema podataka";
+            }
+            if (value < 0.15) {
+                return "Najniži NDRE (problematična zona)";
+            }
+            if (value < 0.25) {
+                return "Srednji NDRE (umerena zona)";
+            }
+            return "Najviši NDRE (dobra zona)";
+        }
+        function buildFeatureInfoUrl(layer, latlng, infoFormat, version) {
+            var point = map.latLngToContainerPoint(latlng, map.getZoom());
+            var size = map.getSize();
+            var bounds = map.getBounds();
+            var sw = map.options.crs.project(bounds.getSouthWest());
+            var ne = map.options.crs.project(bounds.getNorthEast());
+            var wmsVersion = version || "1.1.1";
+            var params = {
+                service: "WMS",
+                request: "GetFeatureInfo",
+                version: wmsVersion,
+                layers: layer.wmsParams.layers,
+                query_layers: layer.wmsParams.layers,
+                styles: layer.wmsParams.styles,
+                bbox: [sw.x, sw.y, ne.x, ne.y].join(","),
+                width: size.x,
+                height: size.y,
+                format: layer.wmsParams.format,
+                transparent: layer.wmsParams.transparent,
+                info_format: infoFormat || "application/json",
+                srs: "EPSG:3857",
+                x: Math.floor(point.x),
+                y: Math.floor(point.y)
+            };
+            if (wmsVersion === "1.3.0") {
+                params.crs = "EPSG:3857";
+                delete params.srs;
+                params.i = Math.floor(point.x);
+                params.j = Math.floor(point.y);
+                delete params.x;
+                delete params.y;
+            }
+            return layer._url + L.Util.getParamString(params, layer._url, true);
+        }
+        function fetchFeatureInfo(layer, latlng, infoFormat) {
+            var url = buildFeatureInfoUrl(layer, latlng, infoFormat);
+            return fetch(url)
+                .then(function(response) {
+                    if ((infoFormat || "").indexOf("application/json") !== -1) {
+                        return response.json();
+                    }
+                    return response.text();
+                });
+        }
+        function fetchFeatureInfo130(layer, latlng, infoFormat) {
+            var url = buildFeatureInfoUrl(layer, latlng, infoFormat, "1.3.0");
+            return fetch(url)
+                .then(function(response) {
+                    if ((infoFormat || "").indexOf("application/json") !== -1) {
+                        return response.json();
+                    }
+                    return response.text();
+                });
+        }
+        function normalizeIndexValue(value) {
+            if (value === null || Number.isNaN(value)) {
+                return null;
+            }
+            if (value > 1.5) {
+                if (value <= 10000) {
+                    return value / 10000;
+                }
+                return value / 65535;
+            }
+            return value;
+        }
+        function fetchFeatureValue(layer, latlng) {
+            return fetchFeatureInfo(layer, latlng, "application/json")
+                .then(function(payload) {
+                    var value = normalizeIndexValue(extractFeatureValue(payload));
+                    if (value === null || Number.isNaN(value)) {
+                        return fetchFeatureInfo(layer, latlng, "text/plain")
+                            .then(function(payloadPlain) {
+                                return normalizeIndexValue(extractFeatureValue(payloadPlain));
+                            });
+                    }
+                    return value;
+                })
+                .then(function(value) {
+                    if (value !== null && !Number.isNaN(value)) {
+                        return value;
+                    }
+                    return fetchFeatureInfo130(layer, latlng, "application/json")
+                        .then(function(payload) {
+                            var value130 = normalizeIndexValue(extractFeatureValue(payload));
+                            if (value130 === null || Number.isNaN(value130)) {
+                                return fetchFeatureInfo130(layer, latlng, "text/plain")
+                                    .then(function(payloadPlain) {
+                                        return normalizeIndexValue(extractFeatureValue(payloadPlain));
+                                    });
+                            }
+                            return value130;
+                        })
+                        .then(function(value130) {
+                            if (value130 !== null && !Number.isNaN(value130)) {
+                                return value130;
+                            }
+                            return fetchFeatureInfo130(layer, latlng, "text/html")
+                                .then(function(payloadHtml) {
+                                    return normalizeIndexValue(extractFeatureValue(payloadHtml));
+                                });
+                        });
+                });
+        }
+        function extractFeatureValue(payload) {
+            if (!payload) {
+                return null;
+            }
+            if (typeof payload === "object") {
+                if (payload.features && payload.features.length) {
+                    var props = payload.features[0].properties || {};
+                    if (typeof props.GRAY_INDEX !== "undefined") {
+                        return Number(props.GRAY_INDEX);
+                    }
+                    if (typeof props.value !== "undefined") {
+                        return Number(props.value);
+                    }
+                }
+                return null;
+            }
+            var text = String(payload);
+            var match = text.match(/GRAY_INDEX\s*=\s*([-0-9.]+)/i) || text.match(/value\s*=\s*([-0-9.]+)/i);
+            return match ? Number(match[1]) : null;
+        }
+        function interpretEvi(value) {
+            if (value === null || Number.isNaN(value)) {
+                return "nema podataka";
+            }
+            if (value < 0) {
+                return "voda/senka ili oblak";
+            }
+            if (value < 0.2) {
+                return "gola zemlja ili vrlo slaba vegetacija";
+            }
+            if (value < 0.4) {
+                return "retka vegetacija ili moguć stres";
+            }
+            if (value < 0.6) {
+                return "dobra vegetacija";
+            }
+            return "veoma gusta i zdrava vegetacija";
+        }
+        function interpretNdvi(value) {
+            if (value === null || Number.isNaN(value)) {
+                return "nema podataka";
+            }
+            if (value < 0) {
+                return "voda/senka ili oblak";
+            }
+            if (value < 0.2) {
+                return "gola zemlja ili vrlo slaba vegetacija";
+            }
+            if (value < 0.4) {
+                return "retka vegetacija ili moguć stres";
+            }
+            if (value < 0.6) {
+                return "dobra vegetacija";
+            }
+            return "veoma gusta i zdrava vegetacija";
+        }
+        function interpretNdmi(value) {
+            if (value === null || Number.isNaN(value)) {
+                return "nema podataka";
+            }
+            if (value < -0.2) {
+                return "veoma suvo";
+            }
+            if (value < 0.0) {
+                return "suvo";
+            }
+            if (value < 0.2) {
+                return "umerena vlaga";
+            }
+            if (value < 0.4) {
+                return "dobra vlaga";
+            }
+            return "visoka vlaga";
+        }
+        function interpretNdre(value) {
+            if (value === null || Number.isNaN(value)) {
+                return "nema podataka";
+            }
+            if (value < 0.0) {
+                return "gola zemlja ili vrlo slaba vegetacija";
+            }
+            if (value < 0.1) {
+                return "slaba vegetacija";
+            }
+            if (value < 0.2) {
+                return "umereno dobra vegetacija";
+            }
+            if (value < 0.3) {
+                return "dobra vegetacija";
+            }
+            return "vrlo dobra vegetacija";
+        }
+        map.on("click", function(e) {
+            if (!indexInfo) {
+                return;
+            }
+            var active = getActiveIndexLayer();
+            if (!active) {
+                showIndexInfo("<strong>Indeks</strong>Uključi NDVI sloj pa klikni na parcelu.");
+                return;
+            }
+            fetchFeatureValue(active.layer, e.latlng)
+                .then(function(value) {
+                    var valueText = (value === null || Number.isNaN(value)) ? "n/a" : value.toFixed(3);
+                    var extra = "";
+                    if (active.label.indexOf("NDVI") !== -1) {
+                        extra = "<div><strong>Tumačenje</strong>" + interpretNdvi(value) + "</div>";
+                    } else if (active.label.indexOf("NDRE") !== -1) {
+                        var interpretation = interpretNdre(value);
+                        var zone = getNdreZone(value);
+                        extra = "<div><strong>Zona</strong>" + zone + "</div>";
+                        extra += "<div><strong>Tumačenje</strong>" + interpretation + "</div>";
+                    }
+                    if (value === null || Number.isNaN(value)) {
+                        extra = "<div><strong>Napomena</strong>Van rastera ili NoData.</div>" + extra;
+                    }
+                    showIndexInfo("<strong>" + active.label + "</strong>Vrednost: " + valueText + extra);
+                })
+                .catch(function(err) {
+                    console.error("GetFeatureInfo greška:", err);
+                    showIndexInfo("<strong>" + active.label + "</strong>Nije moguće pročitati vrednost.");
+                });
+        });
+
+        document.getElementById("parcelBtn").addEventListener("click", function() {
+            var val = document.getElementById("parcelInput").value.trim();
+            zoomToParcel(val);
+        });
+        document.getElementById("parcelInput").addEventListener("keydown", function(e) {
+            if (e.key === "Enter") {
+                zoomToParcel(this.value.trim());
+            }
+        });
+        document.getElementById("parcelInput").addEventListener("input", function() {
+            var val = this.value.trim();
+            clearTimeout(parcelSuggestTimer);
+            parcelSuggestTimer = setTimeout(function() {
+                suggestParcels(val);
+            }, 250);
+        });
+        document.getElementById("parcelInput").addEventListener("change", function() {
+            var val = this.value.trim();
+            if (val) {
+                zoomToParcel(val);
+            }
+        });
+        
+        // Resetuj sugestije kada se promeni opština
+        document.getElementById("opstinaSelect").addEventListener("change", function() {
+            document.getElementById("parcelInput").value = "";
+            updateParcelOptions([]);
+            var statusEl = document.getElementById("parcelStatus");
+            if (statusEl) {
+                statusEl.textContent = "Izaberite opštinu i unesite broj parcele.";
+            }
+        });
+        function injectDroughtSlider() {
+            var container = layerControl && layerControl._container;
+            if (!container) {
+                return;
+            }
+            if (container.querySelector("#droughtOpacity")) {
+                return;
+            }
+            var labels = container.querySelectorAll(".leaflet-control-layers-overlays label");
+            var targetLabel = null;
+            labels.forEach(function(label) {
+                if (label.textContent && label.textContent.indexOf("Stres od suše") !== -1) {
+                    targetLabel = label;
+                }
+            });
+            if (!targetLabel) {
+                return;
+            }
+            var wrapper = document.createElement("div");
+            wrapper.className = "opacity-control";
+            wrapper.innerHTML = "<div>Stres od suše — transparentnost</div>" +
+                "<input id=\"droughtOpacity\" type=\"range\" min=\"0\" max=\"100\" value=\"100\" />";
+            targetLabel.parentNode.insertBefore(wrapper, targetLabel.nextSibling);
+            document.getElementById("droughtOpacity").addEventListener("input", function() {
+                var val = parseInt(this.value, 10);
+                droughtWms.setOpacity(val / 100);
+            });
+        }
+
+        function injectEviSlider() {
+            var container = layerControl && layerControl._container;
+            if (!container) {
+                return;
+            }
+            if (container.querySelector("#eviOpacity")) {
+                return;
+            }
+            var labels = container.querySelectorAll(".leaflet-control-layers-overlays label");
+            var targetLabel = null;
+            labels.forEach(function(label) {
+                if (label.textContent && label.textContent.indexOf("EVI") !== -1) {
+                    targetLabel = label;
+                }
+            });
+            if (!targetLabel) {
+                return;
+            }
+            var wrapper = document.createElement("div");
+            wrapper.className = "opacity-control";
+            wrapper.innerHTML = "<div>EVI — transparentnost</div>" +
+                "<input id=\"eviOpacity\" type=\"range\" min=\"0\" max=\"100\" value=\"100\" />";
+            targetLabel.parentNode.insertBefore(wrapper, targetLabel.nextSibling);
+            document.getElementById("eviOpacity").addEventListener("input", function() {
+                var val = parseInt(this.value, 10);
+                eviWms.setOpacity(val / 100);
+            });
+        }
+
+        function injectNdreSlider() {
+            var container = layerControl && layerControl._container;
+            if (!container) {
+                return;
+            }
+            if (container.querySelector("#ndreOpacity")) {
+                return;
+            }
+            var labels = container.querySelectorAll(".leaflet-control-layers-overlays label");
+            var targetLabel = null;
+            labels.forEach(function(label) {
+                // Traži samo "NDRE" bez "(parcela)" - to je glavni NDRE sloj za celu Srbiju
+                if (label.textContent && label.textContent.indexOf("NDRE") !== -1 && label.textContent.indexOf("(parcela)") === -1) {
+                    targetLabel = label;
+                }
+            });
+            if (!targetLabel) {
+                return;
+            }
+            var wrapper = document.createElement("div");
+            wrapper.className = "opacity-control";
+            wrapper.innerHTML = "<div>NDRE — transparentnost</div>" +
+                "<input id=\"ndreOpacity\" type=\"range\" min=\"0\" max=\"100\" value=\"100\" />";
+            targetLabel.parentNode.insertBefore(wrapper, targetLabel.nextSibling);
+            document.getElementById("ndreOpacity").addEventListener("input", function() {
+                var val = parseInt(this.value, 10);
+                ndreWms.setOpacity(val / 100);
+            });
+        }
+
+        function injectNdmiSlider() {
+            var container = layerControl && layerControl._container;
+            if (!container) {
+                return;
+            }
+            if (container.querySelector("#ndmiOpacity")) {
+                return;
+            }
+            var labels = container.querySelectorAll(".leaflet-control-layers-overlays label");
+            var targetLabel = null;
+            labels.forEach(function(label) {
+                if (label.textContent && label.textContent.indexOf("Moisture Index") !== -1) {
+                    targetLabel = label;
+                }
+            });
+            if (!targetLabel) {
+                return;
+            }
+            var wrapper = document.createElement("div");
+            wrapper.className = "opacity-control";
+            wrapper.innerHTML = "<div>Moisture Index — transparentnost</div>" +
+                "<input id=\"ndmiOpacity\" type=\"range\" min=\"0\" max=\"100\" value=\"100\" />";
+            targetLabel.parentNode.insertBefore(wrapper, targetLabel.nextSibling);
+            document.getElementById("ndmiOpacity").addEventListener("input", function() {
+                var val = parseInt(this.value, 10);
+                ndmiWms.setOpacity(val / 100);
+            });
+        }
+
+        setTimeout(injectParcelSliders, 500);
+        setTimeout(normalizeOverlayOrder, 0);
+        
+        function injectParcelSliders() {
+            var container = layerControl && layerControl._container;
+            if (!container) {
+                return;
+            }
+            var labels = container.querySelectorAll(".leaflet-control-layers-overlays label");
+            
+            // NDVI (parcela) slider
+            var ndviLabel = null;
+            labels.forEach(function(label) {
+                if (label.textContent && label.textContent.indexOf("NDVI (parcela)") !== -1) {
+                    ndviLabel = label;
+                }
+            });
+            if (ndviLabel) {
+                // Ukloni postojeći slider ako postoji
+                var existing = container.querySelector("#ndviParcelOpacity");
+                if (existing && existing.parentNode) {
+                    existing.parentNode.remove();
+                }
+                var wrapper = document.createElement("div");
+                wrapper.className = "opacity-control";
+                wrapper.innerHTML = "<div>NDVI (parcela) — transparentnost</div>" +
+                    "<input id=\"ndviParcelOpacity\" type=\"range\" min=\"0\" max=\"100\" value=\"0\" />";
+                ndviLabel.parentNode.insertBefore(wrapper, ndviLabel.nextSibling);
+                document.getElementById("ndviParcelOpacity").addEventListener("input", function() {
+                    var val = parseInt(this.value, 10);
+                    ndviWms.setOpacity(val / 100);
+                });
+            }
+            
+            // NDMI (parcela) slider
+            var ndmiParcelLabel = null;
+            labels.forEach(function(label) {
+                if (label.textContent && label.textContent.indexOf("NDMI (parcela)") !== -1) {
+                    ndmiParcelLabel = label;
+                }
+            });
+            if (ndmiParcelLabel) {
+                // Ukloni postojeći slider ako postoji
+                var existing = container.querySelector("#ndmiParcelOpacity");
+                if (existing && existing.parentNode) {
+                    existing.parentNode.remove();
+                }
+                var wrapper = document.createElement("div");
+                wrapper.className = "opacity-control";
+                wrapper.innerHTML = "<div>NDMI (parcela) — transparentnost</div>" +
+                    "<input id=\"ndmiParcelOpacity\" type=\"range\" min=\"0\" max=\"100\" value=\"0\" />";
+                ndmiParcelLabel.parentNode.insertBefore(wrapper, ndmiParcelLabel.nextSibling);
+                document.getElementById("ndmiParcelOpacity").addEventListener("input", function() {
+                    var val = parseInt(this.value, 10);
+                    ndmiParcelWms.setOpacity(val / 100);
+                });
+            }
+            
+            // NDRE (parcela) slider
+            var ndreParcelLabel = null;
+            labels.forEach(function(label) {
+                if (label.textContent && label.textContent.indexOf("NDRE (parcela)") !== -1) {
+                    ndreParcelLabel = label;
+                }
+            });
+            if (ndreParcelLabel) {
+                // Ukloni postojeći slider ako postoji
+                var existing = container.querySelector("#ndreParcelOpacity");
+                if (existing && existing.parentNode) {
+                    existing.parentNode.remove();
+                }
+                var wrapper = document.createElement("div");
+                wrapper.className = "opacity-control";
+                wrapper.innerHTML = "<div>NDRE (parcela) — transparentnost</div>" +
+                    "<input id=\"ndreParcelOpacity\" type=\"range\" min=\"0\" max=\"100\" value=\"0\" />";
+                ndreParcelLabel.parentNode.insertBefore(wrapper, ndreParcelLabel.nextSibling);
+                document.getElementById("ndreParcelOpacity").addEventListener("input", function() {
+                    var val = parseInt(this.value, 10);
+                    ndreParcelWms.setOpacity(val / 100);
+                });
+            }
+            
+            // NDRE Zones (parcela) slider
+            var ndreZonesParcelLabel = null;
+            labels.forEach(function(label) {
+                if (label.textContent && label.textContent.indexOf("NDRE Zone (parcela)") !== -1) {
+                    ndreZonesParcelLabel = label;
+                }
+            });
+            if (ndreZonesParcelLabel) {
+                var existing = container.querySelector("#ndreZonesParcelOpacity");
+                if (existing && existing.parentNode) {
+                    existing.parentNode.remove();
+                }
+                var wrapper = document.createElement("div");
+                wrapper.className = "opacity-control";
+                wrapper.innerHTML = "<div>NDRE Zone (parcela) — transparentnost</div>" +
+                    "<input id=\"ndreZonesParcelOpacity\" type=\"range\" min=\"0\" max=\"100\" value=\"70\" />";
+                ndreZonesParcelLabel.parentNode.insertBefore(wrapper, ndreZonesParcelLabel.nextSibling);
+                document.getElementById("ndreZonesParcelOpacity").addEventListener("input", function() {
+                    var val = parseInt(this.value, 10);
+                    ndreZonesParcelWms.setOpacity(val / 100);
+                });
+            }
+        }
+
+        function setNdviLayerForParcel(parcelId) {
+            var safeId = parcelId.replace(/\//g, "_").replace(/\\/g, "_");
+            var layerName = "moj_projekat:ndvi_parcela_" + safeId;
+            ndviWms.setParams({ layers: layerName, styles: 'index_rgb_style', cacheBust: Date.now() });
+            if (!map.hasLayer(ndviWms)) {
+                ndviWms.addTo(map);
+            }
+            // Postavi opacity na 30% (0.3)
+            ndviWms.setOpacity(0.3);
+            // Ponovo dodaj slider-e nakon što se sloj doda
+            setTimeout(injectParcelSliders, 100);
+        }
+        function setNdmiLayerForParcel(parcelId) {
+            var safeId = parcelId.replace(/\//g, "_").replace(/\\/g, "_");
+            var layerName = "moj_projekat:ndmi_parcela_" + safeId;
+            ndmiParcelWms.setParams({ layers: layerName, styles: 'index_rgb_style', cacheBust: Date.now() });
+            if (!map.hasLayer(ndmiParcelWms)) {
+                ndmiParcelWms.addTo(map);
+            }
+            // Ponovo dodaj slider-e nakon što se sloj doda
+            setTimeout(injectParcelSliders, 100);
+        }
+        function setNdreLayerForParcel(parcelId) {
+            var safeId = parcelId.replace(/\//g, "_").replace(/\\/g, "_");
+            var layerName = "moj_projekat:ndre_parcela_" + safeId;
+            ndreParcelWms.setParams({ layers: layerName, styles: 'index_rgb_style', cacheBust: Date.now() });
+            if (!map.hasLayer(ndreParcelWms)) {
+                ndreParcelWms.addTo(map);
+            }
+            // Ponovo dodaj slider-e nakon što se sloj doda
+            setTimeout(injectParcelSliders, 100);
+        }
+        function setNdreZonesLayerForParcel(parcelId) {
+            if (!parcelId) {
+                console.warn("setNdreZonesLayerForParcel: nema parcelId");
+                return;
+            }
+            var safeId = parcelId.replace(/\//g, "_").replace(/\\/g, "_");
+            // Koristimo postojeći NDRE raster sa gradient stilom koji mapira Red kanal na zelene nijanse
+            // Red kanal ima najveću varijaciju (133-160), pa ćemo videti nežne prelaze zelenih nijansi
+            var layerName = "moj_projekat:ndre_parcela_" + safeId;
+            console.log("Postavljam NDRE gradient lejer (postojeći NDRE raster sa zelenim gradijentom):", layerName);
+            ndreZonesParcelWms.setParams({ layers: layerName, styles: 'ndre_gradient_style', cacheBust: Date.now() });
+            if (!map.hasLayer(ndreZonesParcelWms)) {
+                console.log("Dodajem NDRE zones lejer na mapu");
+                ndreZonesParcelWms.addTo(map);
+            }
+            // Postavi opacity na 100% (1.0) za maksimalnu vidljivost zona
+            ndreZonesParcelWms.setOpacity(1.0);
+            console.log("NDRE zones opacity postavljen na:", ndreZonesParcelWms.getOpacity());
+            // Prikaži legendu za NDRE zone
+            var legendEl = document.getElementById("ndreZonesLegend");
+            if (legendEl) {
+                legendEl.style.display = "block";
+            }
+            // Ponovo dodaj slider-e nakon što se sloj doda
+            setTimeout(injectParcelSliders, 100);
+        }
+
+        // Automatski detektuj parcel server URL na osnovu trenutne lokacije
+        var parcelServerUrl = (function() {
+            var hostname = window.location.hostname;
+            // Ako je localhost ili 127.0.0.1, koristi localhost, inače koristi isti hostname
+            if (hostname === "localhost" || hostname === "127.0.0.1") {
+                return "http://localhost:5010";
+            }
+            return "http://" + hostname + ":5010";
+        })();
+
+        function requestParcelNdvi(parcelId) {
+            var layerName = getSelectedOpstina();
+            fetch(parcelServerUrl + "/run?parcel=" + encodeURIComponent(parcelId) + "&layer=" + encodeURIComponent(layerName))
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error("NDVI server error");
+                    }
+                    return response.json();
+                })
+                .then(function() {
+                    setNdviLayerForParcel(parcelId);
+                    setNdmiLayerForParcel(parcelId);
+                    setNdreLayerForParcel(parcelId);
+                })
+                .catch(function(err) {
+                    console.error("NDVI auto nije dostupan:", err);
+                });
+        }
+        function requestParcelNdmi(parcelId) {
+            var layerName = getSelectedOpstina();
+            fetch(parcelServerUrl + "/ndmi?parcel=" + encodeURIComponent(parcelId) + "&layer=" + encodeURIComponent(layerName))
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error("NDMI server error");
+                    }
+                    return response.json();
+                })
+                .then(function() {
+                    setNdmiLayerForParcel(parcelId);
+                })
+                .catch(function(err) {
+                    console.error("NDMI auto nije dostupan:", err);
+                });
+        }
+        function requestParcelNdre(parcelId) {
+            var layerName = getSelectedOpstina();
+            fetch(parcelServerUrl + "/ndre?parcel=" + encodeURIComponent(parcelId) + "&layer=" + encodeURIComponent(layerName))
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error("NDRE server error");
+                    }
+                    return response.json();
+                })
+                .then(function() {
+                    setNdreLayerForParcel(parcelId);
+                })
+                .catch(function(err) {
+                    console.error("NDRE auto nije dostupan:", err);
+                });
+        }
+        function requestParcelNdreZones(parcelId) {
+            if (!parcelId) {
+                console.warn("requestParcelNdreZones: nema parcelId");
+                return;
+            }
+            // Koristimo postojeći NDRE raster sa gradient stilom
+            // Red kanal ima najveću varijaciju (133-160), pa ćemo videti nežne prelaze zelenih nijansi
+            console.log("Koristim postojeći NDRE raster sa gradient stilom za parcelu:", parcelId);
+            var layerName = getSelectedOpstina();
+            // Prvo osiguramo da postoji NDRE raster za parcelu
+            fetch(parcelServerUrl + "/ndre?parcel=" + encodeURIComponent(parcelId) + "&layer=" + encodeURIComponent(layerName))
+                .then(function(response) {
+                    if (!response.ok) {
+                        return response.json().then(function(errData) {
+                            throw new Error("NDRE server error: " + (errData.error || response.status));
+                        });
+                    }
+                    return response.json();
+                })
+                .then(function(data) {
+                    console.log("NDRE raster generisan/već postoji:", data);
+                    // Sada primenimo gradient stil na postojeći NDRE raster
+                    setNdreZonesLayerForParcel(parcelId);
+                })
+                .catch(function(err) {
+                    console.error("NDRE raster nije dostupan:", err);
+                    // Pokušajmo da prikažemo gradient čak i ako nema novog rastera
+                    setNdreZonesLayerForParcel(parcelId);
+                });
+        }
+        function requestParcelNdviCsv(parcelId) {
+            if (!parcelId) {
+                return;
+            }
+            var layerName = getSelectedOpstina();
+            fetch(parcelServerUrl + "/csv?parcel=" + encodeURIComponent(parcelId) + "&days=90&cloud=100&layer=" + encodeURIComponent(layerName))
+                .then(function(response) {
+                    return response.text().then(function(text) {
+                        if (!text || text.trim().length === 0) {
+                            throw new Error("Prazan odgovor od servera. Proverite da li je parcel server pokrenut.");
+                        }
+                        var payload = null;
+                        try {
+                            payload = JSON.parse(text);
+                        } catch (parseErr) {
+                            console.error("JSON parse greška:", parseErr, "Text:", text);
+                            throw new Error("Neispravan JSON odgovor: " + (text.substring(0, 100) || "prazan odgovor"));
+                        }
+                        if (!response.ok) {
+                            var detail = "";
+                            if (payload) {
+                                detail = payload.stderr || payload.stdout || payload.error || "";
+                            }
+                            var msg = detail || text || "NDVI CSV server error";
+                            throw new Error(msg);
+                        }
+                        return payload || {};
+                    });
+                })
+                .then(function(payload) {
+                    lastCsvError = null;
+                    // Sačekaj malo pre nego što počneš da tražiš CSV (da se fajl sačuva)
+                    // Smanjeno vreme čekanja jer CSV fajl je potvrđen da postoji
+                    setTimeout(function() {
+                        waitForParcelCsv(parcelId, 30);
+                    }, 2000);
+                })
+                .catch(function(err) {
+                    console.error("NDVI CSV nije dostupan:", err);
+                    lastCsvError = err.message;
+                    var statusEl = document.getElementById("parcelStatus");
+                    if (statusEl) {
+                        statusEl.textContent = "CSV greška za parcelu " + parcelId + ": " + err.message;
+                    }
+                });
+        }
+        function requestParcelNdmiCsv(parcelId) {
+            if (!parcelId) {
+                return;
+            }
+            var layerName = getSelectedOpstina();
+            fetch(parcelServerUrl + "/ndmi_csv?parcel=" + encodeURIComponent(parcelId) + "&days=90&cloud=100&layer=" + encodeURIComponent(layerName))
+                .then(function(response) {
+                    return response.text().then(function(text) {
+                        if (!text || text.trim().length === 0) {
+                            throw new Error("Prazan odgovor od servera. Proverite da li je parcel server pokrenut.");
+                        }
+                        var payload = null;
+                        try {
+                            payload = JSON.parse(text);
+                        } catch (parseErr) {
+                            console.error("JSON parse greška:", parseErr, "Text:", text);
+                            throw new Error("Neispravan JSON odgovor: " + (text.substring(0, 100) || "prazan odgovor"));
+                        }
+                        if (!response.ok) {
+                            var msg = (payload && payload.error) ? payload.error : (text || "NDMI CSV server error");
+                            throw new Error(msg);
+                        }
+                        return payload || {};
+                    });
+                })
+                .then(function() {
+                    // Sačekaj malo pre nego što počneš da tražiš CSV (da se fajl sačuva)
+                    // Smanjeno vreme čekanja jer CSV fajl je potvrđen da postoji
+                    setTimeout(function() {
+                        waitForParcelCsv(parcelId, 30, "NDMI");
+                    }, 2000);
+                })
+                .catch(function(err) {
+                    console.error("NDMI CSV nije dostupan:", err);
+                });
+        }
+        function requestParcelNdreCsv(parcelId) {
+            if (!parcelId) {
+                return;
+            }
+            var layerName = getSelectedOpstina();
+            fetch(parcelServerUrl + "/ndre_csv?parcel=" + encodeURIComponent(parcelId) + "&days=90&cloud=100&layer=" + encodeURIComponent(layerName))
+                .then(function(response) {
+                    return response.text().then(function(text) {
+                        if (!text || text.trim().length === 0) {
+                            throw new Error("Prazan odgovor od servera. Proverite da li je parcel server pokrenut.");
+                        }
+                        var payload = null;
+                        try {
+                            payload = JSON.parse(text);
+                        } catch (parseErr) {
+                            console.error("JSON parse greška:", parseErr, "Text:", text);
+                            throw new Error("Neispravan JSON odgovor: " + (text.substring(0, 100) || "prazan odgovor"));
+                        }
+                        if (!response.ok) {
+                            var msg = (payload && payload.error) ? payload.error : (text || "NDRE CSV server error");
+                            throw new Error(msg);
+                        }
+                        return payload || {};
+                    });
+                })
+                .then(function() {
+                    // Sačekaj malo pre nego što počneš da tražiš CSV (da se fajl sačuva)
+                    // Smanjeno vreme čekanja jer CSV fajl je potvrđen da postoji
+                    setTimeout(function() {
+                        waitForParcelCsv(parcelId, 30, "NDRE");
+                    }, 2000);
+                })
+                .catch(function(err) {
+                    console.error("NDRE CSV nije dostupan:", err);
+                });
+        }
+        function waitForParcelCsv(parcelId, attemptsLeft, indexName) {
+            var candidates = buildParcelCsvCandidates(parcelId, "parcel", indexName || "NDVI");
+            if (!candidates.length) {
+                return;
+            }
+            console.log("Tražim CSV za parcelu " + parcelId + ", kandidati:", candidates, "preostalo pokušaja:", attemptsLeft);
+            fetchFirstCsv(candidates)
+                .then(function(result) {
+                    console.log("CSV pronađen:", result.path);
+                    // Ažuriraj auto-report odmah kada se CSV pronađe
+                    buildAutoReport();
+                })
+                .catch(function(err) {
+                    console.log("CSV nije pronađen, pokušaj:", 30 - attemptsLeft + 1, "od 30. Kandidati:", candidates);
+                    if (attemptsLeft <= 1) {
+                        console.log("CSV nije pronađen nakon svih pokušaja. Kandidati:", candidates);
+                        // Ipak prikaži auto-report čak i ako CSV nije pronađen
+                        buildAutoReport();
+                        return;
+                    }
+                    setTimeout(function() {
+                        waitForParcelCsv(parcelId, attemptsLeft - 1, indexName || "NDVI");
+                    }, 2000);
+                });
+        }
+
+        function loadTamis() {
+            if (tamisLoaded) return;
+            tamisLoaded = true;
+            fetch(wfsUrlTamis)
+                .then(function(response) { 
+                    if (!response.ok) {
+                        throw new Error("HTTP " + response.status);
+                    }
+                    return response.json(); 
+                })
+                .then(function(data) {
+                    if (data.features && data.features.length > 0) {
+                        tamisLayer.addData(data);
+                        console.log("Tamis učitano:", data.features.length, "tačka");
+                    }
+                })
+                .catch(function(error) {
+                    console.error("Greška kod WFS zahteva (Tamis):", error);
+                });
+        }
+
+        map.on("overlayadd", function(e) {
+            if (e.layer === opstineLatLayer) {
+                loadOpstineLat();
+            } else if (e.layer === opstineCirLayer) {
+                loadOpstineCir();
+            } else if (e.layer === dkpLayer) {
+                loadDkp();
+            } else if (e.layer === kovinLayer) {
+                loadKovin();
+            } else if (e.layer === pancevoLayer) {
+                loadPancevo();
+            } else if (e.layer === pancevoAdreseLayer) {
+                loadPancevoAdrese();
+            } else if (e.layer === tamisLayer) {
+                loadTamis();
+            } else if (e.layer === ndreZonesParcelWms) {
+                // Kada se NDRE zones lejer uključi kroz layer control, postavi opacity na 100%
+                ndreZonesParcelWms.setOpacity(1.0);
+                // Ažuriraj slider ako postoji
+                var slider = document.getElementById("ndreZonesParcelOpacity");
+                if (slider) {
+                    slider.value = 100;
+                }
+                // Prikaži legendu
+                var legendEl = document.getElementById("ndreZonesLegend");
+                if (legendEl) {
+                    legendEl.style.display = "block";
+                }
+                // Ako nema trenutne parcele, možda treba da generišemo lejer za default parcelu
+                // Ali to ne radimo automatski - korisnik mora da klikne na parcelu
+            }
+        });
+
+        // Vremenski grafikon funkcije
+        function toggleTimeChart() {
+            var content = document.getElementById("timeChartContent");
+            var toggle = document.getElementById("timeChartToggle");
+            if (content.style.display === "none") {
+                content.style.display = "block";
+                toggle.textContent = "▲";
+                if (timeChart === null && Object.keys(allCsvData).length > 0) {
+                    updateTimeChart();
+                }
+            } else {
+                content.style.display = "none";
+                toggle.textContent = "▼";
+            }
+        }
+
+        function setTimeRange(days) {
+            console.log("setTimeRange pozvan sa:", days);
+            currentTimeRange = days;
+            // Ažuriraj aktivni dugme
+            document.querySelectorAll(".time-range-btn").forEach(function(btn) {
+                btn.classList.remove("active");
+                if (parseInt(btn.getAttribute("data-days")) === days) {
+                    btn.classList.add("active");
+                }
+            });
+            // Ažuriraj grafikon
+            if (Object.keys(allCsvData).length > 0) {
+                updateTimeChart();
+            } else {
+                console.log("Nema podataka za grafikon");
+            }
+        }
+
+        function updateTimeChart() {
+            var ctx = document.getElementById("timeChart");
+            if (!ctx) {
+                console.error("timeChart canvas element nije pronađen!");
+                return;
+            }
+
+            console.log("updateTimeChart pozvan, currentTimeRange:", currentTimeRange);
+            console.log("allCsvData keys:", Object.keys(allCsvData));
+
+            // Uništi postojeći grafikon ako postoji
+            if (timeChart !== null) {
+                console.log("Uništavam postojeći grafikon");
+                timeChart.destroy();
+                timeChart = null;
+            }
+
+            var now = new Date();
+            var cutoffDate = new Date(now.getTime() - currentTimeRange * 24 * 60 * 60 * 1000);
+
+            var datasets = [];
+            var colors = {
+                "NDVI": { border: "rgb(34, 197, 94)", bg: "rgba(34, 197, 94, 0.1)" },
+                "NDMI": { border: "rgb(59, 130, 246)", bg: "rgba(59, 130, 246, 0.1)" },
+                "NDRE": { border: "rgb(168, 85, 247)", bg: "rgba(168, 85, 247, 0.1)" }
+            };
+
+            ["NDVI", "NDMI", "NDRE"].forEach(function(indexName) {
+                var data = allCsvData[indexName] || [];
+                if (data.length === 0) {
+                    return;
+                }
+
+                // Filtriraj po vremenu i sortiraj
+                var filtered = data.filter(function(row) {
+                    try {
+                        var date = new Date(row.date);
+                        return date >= cutoffDate && row.mean !== null && row.mean !== undefined && !isNaN(row.mean);
+                    } catch (e) {
+                        return false;
+                    }
+                }).sort(function(a, b) {
+                    return new Date(a.date) - new Date(b.date);
+                });
+
+                if (filtered.length === 0) {
+                    return;
+                }
+
+                // Konvertuj datume u timestamp za x osu
+                var chartData = filtered.map(function(row) {
+                    var date = new Date(row.date);
+                    return {
+                        x: date.getTime(), // Koristi timestamp umesto stringa
+                        y: parseFloat(row.mean) || 0
+                    };
+                });
+
+                datasets.push({
+                    label: indexName + " (mean)",
+                    data: chartData,
+                    borderColor: colors[indexName].border,
+                    backgroundColor: colors[indexName].bg,
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.4,
+                    pointRadius: 2,
+                    pointHoverRadius: 4
+                });
+            });
+
+            if (datasets.length === 0) {
+                console.log("Nema podataka za prikaz na grafikonu");
+                return;
+            }
+
+            console.log("Kreiram grafikon sa", datasets.length, "dataset-ova, opseg:", currentTimeRange, "dana");
+            
+            // Proveri da li canvas postoji
+            if (!ctx || !ctx.getContext) {
+                console.error("Canvas element nije pronađen!");
+                return;
+            }
+
+            timeChart = new Chart(ctx, {
+                type: "line",
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: "top"
+                        },
+                        tooltip: {
+                            mode: "index",
+                            intersect: false,
+                            callbacks: {
+                                title: function(context) {
+                                    var timestamp = context[0].parsed.x;
+                                    var date = new Date(timestamp);
+                                    return date.toLocaleDateString("sr-RS", { 
+                                        year: "numeric", 
+                                        month: "long", 
+                                        day: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit"
+                                    });
+                                },
+                                label: function(context) {
+                                    return context.dataset.label + ": " + context.parsed.y.toFixed(3);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: "linear",
+                            position: "bottom",
+                            title: {
+                                display: true,
+                                text: "Datum"
+                            },
+                            ticks: {
+                                callback: function(value, index, ticks) {
+                                    // Konvertuj timestamp u datum
+                                    var date = new Date(value);
+                                    if (currentTimeRange <= 90) {
+                                        return date.toLocaleDateString("sr-RS", { month: "short", day: "numeric" });
+                                    } else {
+                                        return date.toLocaleDateString("sr-RS", { month: "short", year: "numeric" });
+                                    }
+                                }
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: "Vrednost indeksa"
+                            },
+                            min: -0.5,
+                            max: 1.0
+                        }
+                    },
+                    interaction: {
+                        mode: "nearest",
+                        axis: "x",
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        // Wrapper za buildAutoReport da resetuje podatke
+        var originalBuildAutoReport = buildAutoReport;
+        buildAutoReport = function() {
+            allCsvData = {}; // Resetuj podatke
+            originalBuildAutoReport();
+        };
+        
+        // Modifikuj originalnu buildAutoReport da čuva CSV podatke
+        var buildAutoReportWrapper = originalBuildAutoReport;
+        originalBuildAutoReport = function() {
+            allCsvData = {};
+            var reportEl = document.getElementById("autoReport");
+            var parcelId = currentParcelId || document.getElementById("parcelInput").value.trim();
+            var sources = [];
+            if (parcelId) {
+                sources = [
+                    { label: "Parcela NDVI (zona)", index: "NDVI", candidates: buildParcelCsvCandidates(parcelId, "parcel", "NDVI") },
+                    { label: "Parcela NDMI (zona)", index: "NDMI", candidates: buildParcelCsvCandidates(parcelId, "parcel", "NDMI") },
+                    { label: "Parcela NDRE (zona)", index: "NDRE", candidates: buildParcelCsvCandidates(parcelId, "parcel", "NDRE") }
+                ];
+            } else {
+                sources = [
+                    { label: "Parcela NDVI (zona)", index: "NDVI", candidates: ["satelite/SSentinel-2 L2A-3_NDVI-2025-08-02T00_00_00.000Z-2025-09-02T23_59_59.999Z.csv"] },
+                    { label: "Tačka NDVI (centar)", index: "NDVI", candidates: ["satelite/Sentinel-2 L2A-3_NDVI-2025-08-02T00_00_00.000Z-2025-09-02T23_59_59.999Z.csv"] }
+                ];
+            }
+            var blocks = [];
+            var pending = sources.length;
+            sources.forEach(function(src) {
+                fetchFirstCsv(src.candidates || [])
+                    .then(function(result) {
+                        var rows = parseCsv(result.text);
+                        
+                        // Sačuvaj podatke za grafikon
+                        if (parcelId && rows.length > 0) {
+                            allCsvData[src.index] = rows.map(function(row) {
+                                return {
+                                    date: row["C0/date"],
+                                    mean: toNumber(row["C0/mean"]),
+                                    min: toNumber(row["C0/min"]),
+                                    max: toNumber(row["C0/max"]),
+                                    median: toNumber(row["C0/median"]),
+                                    cloud: toNumber(row["C0/cloudCoveragePercent"])
+                                };
+                            }).filter(function(row) {
+                                return row.date && row.mean !== null;
+                            });
+                        }
+                        
+                        var idxLabel = src.index || "NDVI";
+                        var picked = pickLatestGood(rows);
+                        var latest, previous, mean, median, p10, p90, min, max, previousMean, latestDate, period;
+                        var textParts = [];
+                        
+                        if (parcelId) {
+                            textParts.push("Parcela: " + parcelId);
+                        }
+                        
+                        // Za NDMI i NDRE - originalna logika (prikaži SVE podatke iz CSV-a)
+                        if (idxLabel !== "NDVI") {
+                            textParts.push("Ukupno podataka u CSV: " + rows.length);
+                            textParts.push("---");
+                            
+                            // Sortiraj sve podatke od najnovijeg ka starijim (bez filtriranja po cloud coverage)
+                            var allRows = rows.filter(function(row) {
+                                return row["C0/date"] && toNumber(row["C0/mean"]) !== null;
+                            });
+                            
+                            // Sortiraj od najnovijeg ka starijim
+                            allRows.sort(function(a, b) {
+                                return new Date(b["C0/date"]).getTime() - new Date(a["C0/date"]).getTime();
+                            });
+                            
+                            if (allRows.length > 0) {
+                                textParts.push("<strong>Svi podaci (od najnovijeg ka starijim):</strong>");
+                                allRows.forEach(function(row, idx) {
+                                    var rowDate = row["C0/date"];
+                                    var rowMean = toNumber(row["C0/mean"]);
+                                    var rowMedian = toNumber(row["C0/median"]);
+                                    var rowMin = toNumber(row["C0/min"]);
+                                    var rowMax = toNumber(row["C0/max"]);
+                                    var rowP10 = toNumber(row["C0/p10"]);
+                                    var rowP90 = toNumber(row["C0/p90"]);
+                                    
+                                    if (rowMean !== null) {
+                                        var interpretation = "";
+                                        if (idxLabel === "NDMI") {
+                                            interpretation = interpretNdmi(rowMean);
+                                        } else if (idxLabel === "NDRE") {
+                                            interpretation = interpretNdre(rowMean);
+                                        }
+                                        
+                                        var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
+                                        var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
+                                        
+                                        textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
+                                        textParts.push("   " + idxLabel + " Mean: " + rowMean.toFixed(3) + " (" + interpretation + ")");
+                                        if (rowMedian !== null) {
+                                            textParts.push("   Median: " + rowMedian.toFixed(3));
+                                        }
+                                        if (rowMin !== null && rowMax !== null) {
+                                            textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
+                                            // Za NDRE, prikaži zone
+                                            if (idxLabel === "NDRE") {
+                                                textParts.push("   Min zone: " + getNdreZone(rowMin) + ", Max zone: " + getNdreZone(rowMax));
+                                                textParts.push("   Raspon: " + (rowMax - rowMin).toFixed(3));
+                                            }
+                                        }
+                                        if (rowP10 !== null && rowP90 !== null) {
+                                            textParts.push("   p10/p90: " + rowP10.toFixed(3) + " / " + rowP90.toFixed(3));
+                                        }
+                                        textParts.push(""); // Prazan red između podataka
+                                    }
+                                });
+                            } else {
+                                textParts.push("CSV fajl je prazan (nema podataka).");
+                                textParts.push("Mogući razlozi: nema snimaka u poslednjih 60 dana, parcela je van područja pokrivenosti Sentinel-2 satelita, ili greška pri preuzimanju podataka.");
+                            }
+                            blocks.push("<div><strong>" + src.label + "</strong><br>" + textParts.join("<br>") + "</div>");
+                            return;
+                        }
+                        
+                        // Za NDVI - posebna logika
+                        if (!picked) {
+                            textParts.push("Ukupno podataka u CSV: " + rows.length);
+                            textParts.push("---");
+                            
+                            // Sortiraj sve validne podatke od najnovijeg ka starijim
+                            var allGoodRows = rows.filter(function(row) {
+                                return row["C0/date"] && toNumber(row["C0/mean"]) !== null;
+                            });
+                            
+                            // Sortiraj od najnovijeg ka starijim
+                            allGoodRows.sort(function(a, b) {
+                                return new Date(b["C0/date"]).getTime() - new Date(a["C0/date"]).getTime();
+                            });
+                            
+                            if (allGoodRows.length > 0) {
+                                textParts.push("<strong>Svi podaci (od najnovijeg ka starijim):</strong>");
+                                allGoodRows.forEach(function(row, idx) {
+                                    var rowDate = row["C0/date"];
+                                    var rowMean = toNumber(row["C0/mean"]);
+                                    var rowMedian = toNumber(row["C0/median"]);
+                                    var rowMin = toNumber(row["C0/min"]);
+                                    var rowMax = toNumber(row["C0/max"]);
+                                    var rowSampleCount = toNumber(row["C0/sampleCount"]);
+                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]);
+                                    
+                                    if (rowMean !== null) {
+                                        var interpretation = interpretNdvi(rowMean);
+                                        var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
+                                        var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
+                                        
+                                        textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
+                                        textParts.push("   NDVI Mean: " + rowMean.toFixed(3) + " (" + interpretation + ")");
+                                        if (rowMedian !== null) {
+                                            textParts.push("   Median: " + rowMedian.toFixed(3));
+                                        }
+                                        if (rowMin !== null && rowMax !== null) {
+                                            textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
+                                        }
+                                        if (rowSampleCount !== null) {
+                                            textParts.push("   SampleCount: " + rowSampleCount);
+                                        }
+                                        if (rowNoDataCount !== null) {
+                                            textParts.push("   NoDataCount: " + rowNoDataCount);
+                                        }
+                                        textParts.push(""); // Prazan red između podataka
+                                    }
+                                });
+                            } else {
+                                textParts.push("CSV fajl je prazan (nema podataka).");
+                            }
+                            blocks.push("<div><strong>" + src.label + "</strong><br>" + textParts.join("<br>") + "</div>");
+                            return;
+                        }
+                        
+                        latest = picked.latest;
+                        previous = picked.previous;
+                        mean = toNumber(latest["C0/mean"]);
+                        median = toNumber(latest["C0/median"]);
+                        p10 = toNumber(latest["C0/p10"]);
+                        p90 = toNumber(latest["C0/p90"]);
+                        min = toNumber(latest["C0/min"]);
+                        max = toNumber(latest["C0/max"]);
+                        previousMean = previous ? toNumber(previous["C0/mean"]) : null;
+                        latestDate = latest["C0/date"];
+                        period = extractPeriodFromPath(result.path);
+                        textParts = [];
+                        if (parcelId) {
+                            textParts.push("Parcela: " + parcelId);
+                        }
+                        // Prikaži ukupan broj podataka i broj validnih
+                        var totalRows = picked.totalCount || rows.length;
+                        var validRows = picked.validCount || 0;
+                        textParts.push("Ukupno podataka u CSV: " + totalRows + " (validnih: " + validRows + ")");
+                        textParts.push("---");
+                        
+                        // Za NDVI prikaži sve podatke
+                        if (idxLabel === "NDVI") {
+                            // Sortiraj sve validne podatke od najnovijeg ka starijim
+                            var allGoodRows = rows.filter(function(row) {
+                                var cloud = toNumber(row["C0/cloudCoveragePercent"]);
+                                return cloud === null ? true : cloud < 80;
+                            }).filter(function(row) {
+                                return row["C0/date"] && toNumber(row["C0/mean"]) !== null;
+                            });
+                            
+                            // Sortiraj od najnovijeg ka starijim
+                            allGoodRows.sort(function(a, b) {
+                                return new Date(b["C0/date"]).getTime() - new Date(a["C0/date"]).getTime();
+                            });
+                            
+                            if (allGoodRows.length > 0) {
+                                textParts.push("<strong>Svi podaci (od najnovijeg ka starijim):</strong>");
+                                allGoodRows.forEach(function(row, idx) {
+                                    var rowDate = row["C0/date"];
+                                    var rowMean = toNumber(row["C0/mean"]);
+                                    var rowMedian = toNumber(row["C0/median"]);
+                                    var rowMin = toNumber(row["C0/min"]);
+                                    var rowMax = toNumber(row["C0/max"]);
+                                    var rowSampleCount = toNumber(row["C0/sampleCount"]);
+                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]);
+                                    
+                                    if (rowMean !== null) {
+                                        var interpretation = interpretNdvi(rowMean);
+                                        var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
+                                        var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
+                                        
+                                        textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
+                                        textParts.push("   NDVI Mean: " + rowMean.toFixed(3) + " (" + interpretation + ")");
+                                        if (rowMedian !== null) {
+                                            textParts.push("   Median: " + rowMedian.toFixed(3));
+                                        }
+                                        if (rowMin !== null && rowMax !== null) {
+                                            textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
+                                        }
+                                        if (rowSampleCount !== null) {
+                                            textParts.push("   SampleCount: " + rowSampleCount);
+                                        }
+                                        if (rowNoDataCount !== null) {
+                                            textParts.push("   NoDataCount: " + rowNoDataCount);
+                                        }
+                                        textParts.push(""); // Prazan red između podataka
+                                    }
+                                });
+                            } else {
+                                // Fallback ako nema podataka
+                                textParts.push("<strong>Najnoviji validan podatak:</strong>");
+                                textParts.push("Snimak: " + latestDate);
+                                if (period) {
+                                    textParts.push("Period fajla: " + period);
+                                }
+                                if (mean !== null) {
+                                    textParts.push("NDVI mean: " + mean.toFixed(3) + " (" + interpretNdvi(mean) + ")");
+                                }
+                                if (median !== null) {
+                                    textParts.push("median: " + median.toFixed(3));
+                                }
+                                if (p10 !== null && p90 !== null) {
+                                    textParts.push("p10/p90: " + p10.toFixed(3) + " / " + p90.toFixed(3));
+                                }
+                                textParts.push("Trend: " + trendText(previousMean, mean));
+                            }
+                        } else {
+                            // Za NDMI i NDRE - originalna logika (samo najnoviji podatak)
+                            textParts.push("<strong>Najnoviji validan podatak:</strong>");
+                            textParts.push("Snimak: " + latestDate);
+                            if (period) {
+                                textParts.push("Period fajla: " + period);
+                            }
+                            if (mean !== null) {
+                                var interpretation = "";
+                                if (idxLabel === "NDMI") {
+                                    interpretation = interpretNdmi(mean);
+                                } else if (idxLabel === "NDRE") {
+                                    interpretation = interpretNdre(mean);
+                                }
+                                textParts.push(idxLabel + " mean: " + mean.toFixed(3) + " (" + interpretation + ")");
+                            }
+                            // Za NDRE, prikaži min, max i zone
+                            if (idxLabel === "NDRE") {
+                                if (min !== null && max !== null) {
+                                    textParts.push("Min: " + min.toFixed(3) + " (" + getNdreZone(min) + ")");
+                                    textParts.push("Max: " + max.toFixed(3) + " (" + getNdreZone(max) + ")");
+                                    textParts.push("Raspon: " + (max - min).toFixed(3));
+                                }
+                            }
+                            if (median !== null) {
+                                textParts.push("median: " + median.toFixed(3));
+                            }
+                            if (p10 !== null && p90 !== null) {
+                                textParts.push("p10/p90: " + p10.toFixed(3) + " / " + p90.toFixed(3));
+                            }
+                            // Trend u odnosu na prethodni datum (ne prvi u intervalu)
+                            textParts.push("Trend: " + trendText(previousMean, mean));
+                        }
+                        blocks.push("<div><strong>" + src.label + "</strong><br>" + textParts.join("<br>") + "</div>");
+                    })
+                    .catch(function() {
+                        if (parcelId) {
+                            var expected = (src.candidates || []).map(function(p) {
+                                return p.replace("satelite/", "");
+                            });
+                            var errorLine = lastCsvError ? "<br>Greška: " + lastCsvError : "";
+                            blocks.push("<div><strong>" + src.label + "</strong>Nema CSV za parcelu " + parcelId + ".<br>Očekujem: " + expected.join(", ") + errorLine + "</div>");
+                        }
+                    })
+                    .finally(function() {
+                        pending -= 1;
+                        if (pending === 0) {
+                            if (blocks.length) {
+                                reportEl.innerHTML = blocks.join("<hr>");
+                            } else {
+                                reportEl.innerHTML = "<div><strong>Auto-izveštaj</strong>Nema CSV fajlova za prikaz.</div>";
+                            }
+                            reportEl.style.display = "block";
+                            
+                            // Prikaži grafikon ako ima podataka
+                            if (parcelId && Object.keys(allCsvData).length > 0) {
+                                var chartContainer = document.getElementById("timeChartContainer");
+                                if (chartContainer) {
+                                    chartContainer.style.display = "block";
+                                    if (timeChart === null) {
+                                        updateTimeChart();
+                                    } else {
+                                        updateTimeChart();
+                                    }
+                                }
+                            } else {
+                                var chartContainer = document.getElementById("timeChartContainer");
+                                if (chartContainer) {
+                                    chartContainer.style.display = "none";
+                                }
+                            }
+                        }
+                    });
+            });
+        };
+    </script>
+</body>
+</html>
