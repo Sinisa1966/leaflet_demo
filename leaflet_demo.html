@@ -212,12 +212,33 @@
             height: 250px;
             width: 100%;
         }
+        .index-info {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 14px;
+            border-radius: 10px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+            border: 1px solid #e6e6e6;
+            font-size: 12px;
+            display: none;
+            max-width: 250px;
+        }
+        .index-info strong {
+            display: block;
+            margin-bottom: 4px;
+            color: #2c7be5;
+        }
     </style>
 </head>
 <body>
 
     <!-- meta bar uklonjen po zahtevu -->
-    <!-- info-balon uklonjen po zahtevu -->
+    
+    <!-- Info balon za prikaz NDRE/NDVI vrednosti na klik -->
+    <div id="indexInfo" class="index-info"></div>
 
     <div class="controls">
         <h3>GIS Kontrola (WFS)</h3>
@@ -240,19 +261,19 @@
         <small id="parcelStatus">Unesite broj parcele za detalje.</small>
         <div id="autoReport" class="auto-report" style="display: none;"></div>
         <div id="ndreZonesLegend" style="display: none; margin-top: 15px; padding: 10px; background: #f9f9f9; border-radius: 4px; border: 1px solid #ddd;">
-            <strong style="font-size: 12px; display: block; margin-bottom: 8px;">NDRE Zone:</strong>
+            <strong style="font-size: 12px; display: block; margin-bottom: 8px;">NDRE Zone (azotna prihrana):</strong>
             <div style="font-size: 11px; line-height: 1.6;">
                 <div style="display: flex; align-items: center; margin-bottom: 4px;">
                     <div style="width: 20px; height: 15px; background: rgb(255, 0, 0); border: 1px solid #999; margin-right: 8px;"></div>
-                    <span>Najniži NDRE (0-33%) - problematična zona</span>
+                    <span>Crvena (&lt; 0.14) - više azota, manje đubrenja</span>
                 </div>
                 <div style="display: flex; align-items: center; margin-bottom: 4px;">
                     <div style="width: 20px; height: 15px; background: rgb(255, 255, 0); border: 1px solid #999; margin-right: 8px;"></div>
-                    <span>Srednji NDRE (33-66%) - umerena zona</span>
+                    <span>Žuta (0.14 - 0.19) - standardna količina</span>
                 </div>
                 <div style="display: flex; align-items: center;">
                     <div style="width: 20px; height: 15px; background: rgb(0, 255, 0); border: 1px solid #999; margin-right: 8px;"></div>
-                    <span>Najviši NDRE (66-100%) - dobra zona</span>
+                    <span>Zelena (≥ 0.19) - manje azota, više đubrenja</span>
                 </div>
             </div>
         </div>
@@ -892,6 +913,17 @@
         });
         ndreParcelWms.setOpacity(0); // Početna transparentnost 0 (nevidljivo) - ne dodaje se na mapu po defaultu
         
+        // NDRE value raster za parcele (FLOAT32 sirove vrednosti za GetFeatureInfo)
+        var ndreValueParcelWms = L.tileLayer.wms('http://localhost:8083/geoserver/moj_projekat/wms', {
+            layers: 'moj_projekat:ndre_value_parcela_25991',
+            format: 'image/png',
+            transparent: true,
+            styles: 'raster',
+            attribution: 'Copernicus Sentinel-2 NDRE Value (parcela)',
+            cacheBust: Date.now()
+        });
+        // Value layer je nevidljiv (nije dodat na mapu), koristi se samo za GetFeatureInfo
+        
         // NDRE zones raster za parcele (najniži, srednji, najviši)
         // Koristi postojeći NDRE raster sa gradient stilom koji mapira Red kanal na zelene nijanse
         var ndreZonesParcelWms = L.tileLayer.wms('http://localhost:8083/geoserver/moj_projekat/wms', {
@@ -1091,6 +1123,7 @@
         })();
 
         function toNumber(value) {
+            if (value === "" || value === undefined || value === null) return null;
             var n = Number(value);
             return Number.isFinite(n) ? n : null;
         }
@@ -1267,17 +1300,14 @@
                             textParts.push("Parcela: " + parcelId);
                         }
                         
-                        // Za NDMI i NDRE - originalna logika (prikaži SVE podatke iz CSV-a)
+                        // Za NDMI i NDRE - prikaži SVE podatke iz CSV-a (svi datumi)
                         if (idxLabel !== "NDVI") {
                             textParts.push("Ukupno podataka u CSV: " + rows.length);
                             textParts.push("---");
                             
-                            // Sortiraj sve podatke od najnovijeg ka starijim (bez filtriranja po cloud coverage)
                             var allRows = rows.filter(function(row) {
                                 return row["C0/date"] && toNumber(row["C0/mean"]) !== null;
                             });
-                            
-                            // Sortiraj od najnovijeg ka starijim
                             allRows.sort(function(a, b) {
                                 return new Date(b["C0/date"]).getTime() - new Date(a["C0/date"]).getTime();
                             });
@@ -1292,40 +1322,38 @@
                                     var rowMax = toNumber(row["C0/max"]);
                                     var rowP10 = toNumber(row["C0/p10"]);
                                     var rowP90 = toNumber(row["C0/p90"]);
+                                    var rowSampleCount = toNumber(row["C0/sampleCount"]);
+                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]) || 0;
+                                    var validni = (rowSampleCount !== null) ? (rowSampleCount - rowNoDataCount) : null;
                                     
+                                    var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
+                                    var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
+                                    
+                                    textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
                                     if (rowMean !== null) {
                                         var interpretation = "";
-                                        if (idxLabel === "NDMI") {
-                                            interpretation = interpretNdmi(rowMean);
-                                        } else if (idxLabel === "NDRE") {
-                                            interpretation = interpretNdre(rowMean);
-                                        }
-                                        
-                                        var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
-                                        var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
-                                        
-                                        textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
+                                        if (idxLabel === "NDMI") interpretation = interpretNdmi(rowMean);
+                                        else if (idxLabel === "NDRE") interpretation = interpretNdre(rowMean);
                                         textParts.push("   " + idxLabel + " Mean: " + rowMean.toFixed(3) + " (" + interpretation + ")");
-                                        if (rowMedian !== null) {
-                                            textParts.push("   Median: " + rowMedian.toFixed(3));
-                                        }
-                                        if (rowMin !== null && rowMax !== null) {
-                                            textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
-                                            // Za NDRE, prikaži zone
-                                            if (idxLabel === "NDRE") {
-                                                textParts.push("   Min zone: " + getNdreZone(rowMin) + ", Max zone: " + getNdreZone(rowMax));
-                                                textParts.push("   Raspon: " + (rowMax - rowMin).toFixed(3));
-                                            }
-                                        }
-                                        if (rowP10 !== null && rowP90 !== null) {
-                                            textParts.push("   p10/p90: " + rowP10.toFixed(3) + " / " + rowP90.toFixed(3));
-                                        }
-                                        textParts.push(""); // Prazan red između podataka
+                                    } else {
+                                        textParts.push("   " + idxLabel + " Mean: N/A (oblaci)");
                                     }
+                                    if (rowMedian !== null) textParts.push("   Median: " + rowMedian.toFixed(3));
+                                    if (rowMin !== null && rowMax !== null) {
+                                        textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
+                                        if (idxLabel === "NDRE") {
+                                            textParts.push("   Min zone: " + getNdreZone(rowMin) + ", Max zone: " + getNdreZone(rowMax));
+                                            textParts.push("   Raspon: " + (rowMax - rowMin).toFixed(3));
+                                        }
+                                    }
+                                    if (rowP10 !== null && rowP90 !== null) textParts.push("   p10/p90: " + rowP10.toFixed(3) + " / " + rowP90.toFixed(3));
+                                    if (validni !== null) textParts.push("   Validni pikseli: " + validni);
+                                    if (rowNoDataCount > 0) textParts.push("   Pikseli prekriveni oblacima: " + rowNoDataCount);
+                                    textParts.push("");
                                 });
                             } else {
                                 textParts.push("CSV fajl je prazan (nema podataka).");
-                                textParts.push("Mogući razlozi: nema snimaka u poslednjih 60 dana, parcela je van područja pokrivenosti Sentinel-2 satelita, ili greška pri preuzimanju podataka.");
+                                textParts.push("Mogući razlozi: nema snimaka u traženom periodu, parcela je van područja pokrivenosti Sentinel-2 satelita, ili greška pri preuzimanju podataka.");
                             }
                             blocks.push("<div><strong>" + src.label + "</strong><br>" + textParts.join("<br>") + "</div>");
                             return;
@@ -1336,48 +1364,52 @@
                             textParts.push("Ukupno podataka u CSV: " + rows.length);
                             textParts.push("---");
                             
-                            // Sortiraj sve validne podatke od najnovijeg ka starijim
-                            var allGoodRows = rows.filter(function(row) {
+                            var allRowsNdvi = rows.filter(function(row) {
                                 return row["C0/date"] && toNumber(row["C0/mean"]) !== null;
                             });
-                            
-                            // Sortiraj od najnovijeg ka starijim
-                            allGoodRows.sort(function(a, b) {
+                            allRowsNdvi.sort(function(a, b) {
                                 return new Date(b["C0/date"]).getTime() - new Date(a["C0/date"]).getTime();
                             });
                             
-                            if (allGoodRows.length > 0) {
+                            if (allRowsNdvi.length > 0) {
                                 textParts.push("<strong>Svi podaci (od najnovijeg ka starijim):</strong>");
-                                allGoodRows.forEach(function(row, idx) {
+                                var dateOptions = allRowsNdvi.map(function(row) {
+                                    var rowDate = row["C0/date"];
+                                    if (!rowDate) return null;
+                                    var dateObj = new Date(rowDate);
+                                    var dateKey = dateObj.toISOString().split('T')[0];
+                                    var dateStr = dateObj.toLocaleDateString("sr-RS");
+                                    return { key: dateKey, label: dateStr, row: row };
+                                }).filter(function(opt) { return opt !== null; });
+                                var goodForLayer = allRowsNdvi.filter(function(r) { return toNumber(r["C0/mean"]) !== null; });
+                                if (goodForLayer.length > 0) {
+                                    var first = allRowsNdvi.find(function(r) { return toNumber(r["C0/mean"]) !== null; });
+                                    if (first) setNdviLayerForParcel(parcelId, new Date(first["C0/date"]).toISOString().split('T')[0]);
+                                }
+                                allRowsNdvi.forEach(function(row, idx) {
                                     var rowDate = row["C0/date"];
                                     var rowMean = toNumber(row["C0/mean"]);
                                     var rowMedian = toNumber(row["C0/median"]);
                                     var rowMin = toNumber(row["C0/min"]);
                                     var rowMax = toNumber(row["C0/max"]);
                                     var rowSampleCount = toNumber(row["C0/sampleCount"]);
-                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]);
+                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]) || 0;
+                                    var validni = (rowSampleCount !== null) ? (rowSampleCount - rowNoDataCount) : null;
                                     
+                                    var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
+                                    var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
+                                    
+                                    textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
                                     if (rowMean !== null) {
-                                        var interpretation = interpretNdvi(rowMean);
-                                        var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
-                                        var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
-                                        
-                                        textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
-                                        textParts.push("   NDVI Mean: " + rowMean.toFixed(3) + " (" + interpretation + ")");
-                                        if (rowMedian !== null) {
-                                            textParts.push("   Median: " + rowMedian.toFixed(3));
-                                        }
-                                        if (rowMin !== null && rowMax !== null) {
-                                            textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
-                                        }
-                                        if (rowSampleCount !== null) {
-                                            textParts.push("   SampleCount: " + rowSampleCount);
-                                        }
-                                        if (rowNoDataCount !== null) {
-                                            textParts.push("   NoDataCount: " + rowNoDataCount);
-                                        }
-                                        textParts.push(""); // Prazan red između podataka
+                                        textParts.push("   NDVI Mean: " + rowMean.toFixed(3) + " (" + interpretNdvi(rowMean) + ")");
+                                    } else {
+                                        textParts.push("   NDVI Mean: N/A (oblaci)");
                                     }
+                                    if (rowMedian !== null) textParts.push("   Median: " + rowMedian.toFixed(3));
+                                    if (rowMin !== null && rowMax !== null) textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
+                                    if (validni !== null) textParts.push("   Validni pikseli: " + validni);
+                                    if (rowNoDataCount > 0) textParts.push("   Pikseli prekriveni oblacima: " + rowNoDataCount);
+                                    textParts.push("");
                                 });
                             } else {
                                 textParts.push("CSV fajl je prazan (nema podataka).");
@@ -1409,51 +1441,41 @@
                         
                         // Za NDVI prikaži sve podatke
                         if (idxLabel === "NDVI") {
-                            // Sortiraj sve validne podatke od najnovijeg ka starijim
-                            var allGoodRows = rows.filter(function(row) {
-                                var cloud = toNumber(row["C0/cloudCoveragePercent"]);
-                                return cloud === null ? true : cloud < 80;
-                            }).filter(function(row) {
+                            var allRowsNdvi = rows.filter(function(row) {
                                 return row["C0/date"] && toNumber(row["C0/mean"]) !== null;
                             });
-                            
-                            // Sortiraj od najnovijeg ka starijim
-                            allGoodRows.sort(function(a, b) {
+                            allRowsNdvi.sort(function(a, b) {
                                 return new Date(b["C0/date"]).getTime() - new Date(a["C0/date"]).getTime();
                             });
                             
-                            if (allGoodRows.length > 0) {
+                            if (allRowsNdvi.length > 0) {
                                 textParts.push("<strong>Svi podaci (od najnovijeg ka starijim):</strong>");
-                                allGoodRows.forEach(function(row, idx) {
+                                var firstValid = allRowsNdvi.find(function(r) { return toNumber(r["C0/mean"]) !== null; });
+                                if (firstValid) setNdviLayerForParcel(parcelId, new Date(firstValid["C0/date"]).toISOString().split('T')[0]);
+                                allRowsNdvi.forEach(function(row, idx) {
                                     var rowDate = row["C0/date"];
                                     var rowMean = toNumber(row["C0/mean"]);
                                     var rowMedian = toNumber(row["C0/median"]);
                                     var rowMin = toNumber(row["C0/min"]);
                                     var rowMax = toNumber(row["C0/max"]);
                                     var rowSampleCount = toNumber(row["C0/sampleCount"]);
-                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]);
+                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]) || 0;
+                                    var validni = (rowSampleCount !== null) ? (rowSampleCount - rowNoDataCount) : null;
                                     
+                                    var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
+                                    var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
+                                    
+                                    textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
                                     if (rowMean !== null) {
-                                        var interpretation = interpretNdvi(rowMean);
-                                        var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
-                                        var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
-                                        
-                                        textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
-                                        textParts.push("   NDVI Mean: " + rowMean.toFixed(3) + " (" + interpretation + ")");
-                                        if (rowMedian !== null) {
-                                            textParts.push("   Median: " + rowMedian.toFixed(3));
-                                        }
-                                        if (rowMin !== null && rowMax !== null) {
-                                            textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
-                                        }
-                                        if (rowSampleCount !== null) {
-                                            textParts.push("   SampleCount: " + rowSampleCount);
-                                        }
-                                        if (rowNoDataCount !== null) {
-                                            textParts.push("   NoDataCount: " + rowNoDataCount);
-                                        }
-                                        textParts.push(""); // Prazan red između podataka
+                                        textParts.push("   NDVI Mean: " + rowMean.toFixed(3) + " (" + interpretNdvi(rowMean) + ")");
+                                    } else {
+                                        textParts.push("   NDVI Mean: N/A (oblaci)");
                                     }
+                                    if (rowMedian !== null) textParts.push("   Median: " + rowMedian.toFixed(3));
+                                    if (rowMin !== null && rowMax !== null) textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
+                                    if (validni !== null) textParts.push("   Validni pikseli: " + validni);
+                                    if (rowNoDataCount > 0) textParts.push("   Pikseli prekriveni oblacima: " + rowNoDataCount);
+                                    textParts.push("");
                                 });
                             } else {
                                 // Fallback ako nema podataka
@@ -1559,13 +1581,30 @@
             indexInfo.style.display = "block";
         }
         function getActiveIndexLayer() {
-            if (map.hasLayer(ndreZonesParcelWms) && ndreZonesParcelWms.getOpacity() > 0) {
-                return { layer: ndreParcelWms, label: "NDRE", isZones: true };
+            // Proveri NDRE Zones - ako je na mapi, koristi ndreValueParcelWms za čitanje vrednosti
+            if (ndreZonesParcelWms && map.hasLayer(ndreZonesParcelWms)) {
+                // Koristi NDRE value layer za čitanje vrednosti (FLOAT32)
+                if (ndreValueParcelWms) {
+                    return { layer: ndreValueParcelWms, label: "NDRE Zone", isZones: true };
+                } else {
+                    return { layer: ndreZonesParcelWms, label: "NDRE Zone", isZones: true };
+                }
             }
-            if (map.hasLayer(ndreParcelWms) && ndreParcelWms.getOpacity() > 0) {
-                return { layer: ndreParcelWms, label: "NDRE" };
+            // Proveri običan NDRE - takođe koristi value layer za čitanje
+            if (ndreParcelWms && map.hasLayer(ndreParcelWms)) {
+                // Koristi NDRE value layer za čitanje vrednosti umesto RGB rastera
+                if (ndreValueParcelWms) {
+                    return { layer: ndreValueParcelWms, label: "NDRE" };
+                } else {
+                    return { layer: ndreParcelWms, label: "NDRE" };
+                }
             }
-            if (map.hasLayer(ndviWms)) {
+            // Proveri NDMI
+            if (ndmiParcelWms && map.hasLayer(ndmiParcelWms)) {
+                return { layer: ndmiParcelWms, label: "NDMI" };
+            }
+            // Proveri NDVI
+            if (ndviWms && map.hasLayer(ndviWms)) {
                 return { layer: ndviWms, label: "NDVI" };
             }
             return null;
@@ -1574,13 +1613,13 @@
             if (value === null || Number.isNaN(value)) {
                 return "nema podataka";
             }
-            if (value < 0.15) {
-                return "Najniži NDRE (problematična zona)";
+            if (value < 0.14) {
+                return "Crvena zona (više azota - može manje đubrenja)";
             }
-            if (value < 0.25) {
-                return "Srednji NDRE (umerena zona)";
+            if (value < 0.19) {
+                return "Žuta zona (standardna količina azota)";
             }
-            return "Najviši NDRE (dobra zona)";
+            return "Zelena zona (manje azota - može više đubrenja)";
         }
         function buildFeatureInfoUrl(layer, latlng, infoFormat, version) {
             var point = map.latLngToContainerPoint(latlng, map.getZoom());
@@ -1699,6 +1738,15 @@
                     if (typeof props.value !== "undefined") {
                         return Number(props.value);
                     }
+                    // Pokušaj sve numeričke property-je
+                    for (var key in props) {
+                        if (props.hasOwnProperty(key)) {
+                            var val = Number(props[key]);
+                            if (Number.isFinite(val)) {
+                                return val;
+                            }
+                        }
+                    }
                 }
                 return null;
             }
@@ -1784,7 +1832,7 @@
             }
             var active = getActiveIndexLayer();
             if (!active) {
-                showIndexInfo("<strong>Indeks</strong>Uključi NDVI sloj pa klikni na parcelu.");
+                showIndexInfo("<strong>Indeks</strong>Uključi NDVI, NDMI ili NDRE sloj pa klikni na parcelu.");
                 return;
             }
             fetchFeatureValue(active.layer, e.latlng)
@@ -2094,6 +2142,9 @@
             if (!map.hasLayer(ndreParcelWms)) {
                 ndreParcelWms.addTo(map);
             }
+            // Postavi i NDRE value layer (nevidljiv, za GetFeatureInfo)
+            var valueLayerName = "moj_projekat:ndre_value_parcela_" + safeId;
+            ndreValueParcelWms.setParams({ layers: valueLayerName, styles: 'raster', cacheBust: Date.now() });
             // Ponovo dodaj slider-e nakon što se sloj doda
             setTimeout(injectParcelSliders, 100);
         }
@@ -2103,18 +2154,20 @@
                 return;
             }
             var safeId = parcelId.replace(/\//g, "_").replace(/\\/g, "_");
-            // Koristimo postojeći NDRE raster sa gradient stilom koji mapira Red kanal na zelene nijanse
-            // Red kanal ima najveću varijaciju (133-160), pa ćemo videti nežne prelaze zelenih nijansi
-            var layerName = "moj_projekat:ndre_parcela_" + safeId;
-            console.log("Postavljam NDRE gradient lejer (postojeći NDRE raster sa zelenim gradijentom):", layerName);
-            ndreZonesParcelWms.setParams({ layers: layerName, styles: 'ndre_gradient_style', cacheBust: Date.now() });
+            // Koristimo NDRE zones raster sa gradient stilom koji mapira vrednosti na zelene nijanse
+            var layerName = "moj_projekat:ndre_zones_parcela_" + safeId;
+            console.log("Postavljam NDRE zones lejer:", layerName);
+            ndreZonesParcelWms.setParams({ layers: layerName, styles: 'index_rgb_style', cacheBust: Date.now() });
             if (!map.hasLayer(ndreZonesParcelWms)) {
                 console.log("Dodajem NDRE zones lejer na mapu");
                 ndreZonesParcelWms.addTo(map);
             }
             // Postavi opacity na 100% (1.0) za maksimalnu vidljivost zona
             ndreZonesParcelWms.setOpacity(1.0);
-            console.log("NDRE zones opacity postavljen na:", ndreZonesParcelWms.getOpacity());
+            console.log("NDRE zones opacity postavljen na 1.0");
+            // Postavi i NDRE value layer (nevidljiv, za GetFeatureInfo)
+            var valueLayerName = "moj_projekat:ndre_value_parcela_" + safeId;
+            ndreValueParcelWms.setParams({ layers: valueLayerName, styles: 'raster', cacheBust: Date.now() });
             // Prikaži legendu za NDRE zone
             var legendEl = document.getElementById("ndreZonesLegend");
             if (legendEl) {
@@ -2209,7 +2262,6 @@
                     setNdreZonesLayerForParcel(parcelId);
                 })
                 .catch(function(err) {
-                    console.error("NDRE raster nije dostupan:", err);
                     // Pokušajmo da prikažemo gradient čak i ako nema novog rastera
                     setNdreZonesLayerForParcel(parcelId);
                 });
@@ -2219,7 +2271,7 @@
                 return;
             }
             var layerName = getSelectedOpstina();
-            fetch(parcelServerUrl + "/csv?parcel=" + encodeURIComponent(parcelId) + "&days=90&cloud=100&layer=" + encodeURIComponent(layerName))
+            fetch(parcelServerUrl + "/csv?parcel=" + encodeURIComponent(parcelId) + "&days=30&cloud=100&layer=" + encodeURIComponent(layerName))
                 .then(function(response) {
                     return response.text().then(function(text) {
                         if (!text || text.trim().length === 0) {
@@ -2265,7 +2317,7 @@
                 return;
             }
             var layerName = getSelectedOpstina();
-            fetch(parcelServerUrl + "/ndmi_csv?parcel=" + encodeURIComponent(parcelId) + "&days=90&cloud=100&layer=" + encodeURIComponent(layerName))
+            fetch(parcelServerUrl + "/ndmi_csv?parcel=" + encodeURIComponent(parcelId) + "&days=30&cloud=100&layer=" + encodeURIComponent(layerName))
                 .then(function(response) {
                     return response.text().then(function(text) {
                         if (!text || text.trim().length === 0) {
@@ -2658,17 +2710,14 @@
                             textParts.push("Parcela: " + parcelId);
                         }
                         
-                        // Za NDMI i NDRE - originalna logika (prikaži SVE podatke iz CSV-a)
+                        // Za NDMI i NDRE - prikaži SVE podatke iz CSV-a (svi datumi)
                         if (idxLabel !== "NDVI") {
                             textParts.push("Ukupno podataka u CSV: " + rows.length);
                             textParts.push("---");
                             
-                            // Sortiraj sve podatke od najnovijeg ka starijim (bez filtriranja po cloud coverage)
                             var allRows = rows.filter(function(row) {
                                 return row["C0/date"] && toNumber(row["C0/mean"]) !== null;
                             });
-                            
-                            // Sortiraj od najnovijeg ka starijim
                             allRows.sort(function(a, b) {
                                 return new Date(b["C0/date"]).getTime() - new Date(a["C0/date"]).getTime();
                             });
@@ -2683,40 +2732,38 @@
                                     var rowMax = toNumber(row["C0/max"]);
                                     var rowP10 = toNumber(row["C0/p10"]);
                                     var rowP90 = toNumber(row["C0/p90"]);
+                                    var rowSampleCount = toNumber(row["C0/sampleCount"]);
+                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]) || 0;
+                                    var validni = (rowSampleCount !== null) ? (rowSampleCount - rowNoDataCount) : null;
                                     
+                                    var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
+                                    var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
+                                    
+                                    textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
                                     if (rowMean !== null) {
                                         var interpretation = "";
-                                        if (idxLabel === "NDMI") {
-                                            interpretation = interpretNdmi(rowMean);
-                                        } else if (idxLabel === "NDRE") {
-                                            interpretation = interpretNdre(rowMean);
-                                        }
-                                        
-                                        var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
-                                        var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
-                                        
-                                        textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
+                                        if (idxLabel === "NDMI") interpretation = interpretNdmi(rowMean);
+                                        else if (idxLabel === "NDRE") interpretation = interpretNdre(rowMean);
                                         textParts.push("   " + idxLabel + " Mean: " + rowMean.toFixed(3) + " (" + interpretation + ")");
-                                        if (rowMedian !== null) {
-                                            textParts.push("   Median: " + rowMedian.toFixed(3));
-                                        }
-                                        if (rowMin !== null && rowMax !== null) {
-                                            textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
-                                            // Za NDRE, prikaži zone
-                                            if (idxLabel === "NDRE") {
-                                                textParts.push("   Min zone: " + getNdreZone(rowMin) + ", Max zone: " + getNdreZone(rowMax));
-                                                textParts.push("   Raspon: " + (rowMax - rowMin).toFixed(3));
-                                            }
-                                        }
-                                        if (rowP10 !== null && rowP90 !== null) {
-                                            textParts.push("   p10/p90: " + rowP10.toFixed(3) + " / " + rowP90.toFixed(3));
-                                        }
-                                        textParts.push(""); // Prazan red između podataka
+                                    } else {
+                                        textParts.push("   " + idxLabel + " Mean: N/A (oblaci)");
                                     }
+                                    if (rowMedian !== null) textParts.push("   Median: " + rowMedian.toFixed(3));
+                                    if (rowMin !== null && rowMax !== null) {
+                                        textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
+                                        if (idxLabel === "NDRE") {
+                                            textParts.push("   Min zone: " + getNdreZone(rowMin) + ", Max zone: " + getNdreZone(rowMax));
+                                            textParts.push("   Raspon: " + (rowMax - rowMin).toFixed(3));
+                                        }
+                                    }
+                                    if (rowP10 !== null && rowP90 !== null) textParts.push("   p10/p90: " + rowP10.toFixed(3) + " / " + rowP90.toFixed(3));
+                                    if (validni !== null) textParts.push("   Validni pikseli: " + validni);
+                                    if (rowNoDataCount > 0) textParts.push("   Pikseli prekriveni oblacima: " + rowNoDataCount);
+                                    textParts.push("");
                                 });
                             } else {
                                 textParts.push("CSV fajl je prazan (nema podataka).");
-                                textParts.push("Mogući razlozi: nema snimaka u poslednjih 60 dana, parcela je van područja pokrivenosti Sentinel-2 satelita, ili greška pri preuzimanju podataka.");
+                                textParts.push("Mogući razlozi: nema snimaka u traženom periodu, parcela je van područja pokrivenosti Sentinel-2 satelita, ili greška pri preuzimanju podataka.");
                             }
                             blocks.push("<div><strong>" + src.label + "</strong><br>" + textParts.join("<br>") + "</div>");
                             return;
@@ -2727,48 +2774,52 @@
                             textParts.push("Ukupno podataka u CSV: " + rows.length);
                             textParts.push("---");
                             
-                            // Sortiraj sve validne podatke od najnovijeg ka starijim
-                            var allGoodRows = rows.filter(function(row) {
+                            var allRowsNdvi = rows.filter(function(row) {
                                 return row["C0/date"] && toNumber(row["C0/mean"]) !== null;
                             });
-                            
-                            // Sortiraj od najnovijeg ka starijim
-                            allGoodRows.sort(function(a, b) {
+                            allRowsNdvi.sort(function(a, b) {
                                 return new Date(b["C0/date"]).getTime() - new Date(a["C0/date"]).getTime();
                             });
                             
-                            if (allGoodRows.length > 0) {
+                            if (allRowsNdvi.length > 0) {
                                 textParts.push("<strong>Svi podaci (od najnovijeg ka starijim):</strong>");
-                                allGoodRows.forEach(function(row, idx) {
+                                var dateOptions = allRowsNdvi.map(function(row) {
+                                    var rowDate = row["C0/date"];
+                                    if (!rowDate) return null;
+                                    var dateObj = new Date(rowDate);
+                                    var dateKey = dateObj.toISOString().split('T')[0];
+                                    var dateStr = dateObj.toLocaleDateString("sr-RS");
+                                    return { key: dateKey, label: dateStr, row: row };
+                                }).filter(function(opt) { return opt !== null; });
+                                var goodForLayer = allRowsNdvi.filter(function(r) { return toNumber(r["C0/mean"]) !== null; });
+                                if (goodForLayer.length > 0) {
+                                    var first = allRowsNdvi.find(function(r) { return toNumber(r["C0/mean"]) !== null; });
+                                    if (first) setNdviLayerForParcel(parcelId, new Date(first["C0/date"]).toISOString().split('T')[0]);
+                                }
+                                allRowsNdvi.forEach(function(row, idx) {
                                     var rowDate = row["C0/date"];
                                     var rowMean = toNumber(row["C0/mean"]);
                                     var rowMedian = toNumber(row["C0/median"]);
                                     var rowMin = toNumber(row["C0/min"]);
                                     var rowMax = toNumber(row["C0/max"]);
                                     var rowSampleCount = toNumber(row["C0/sampleCount"]);
-                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]);
+                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]) || 0;
+                                    var validni = (rowSampleCount !== null) ? (rowSampleCount - rowNoDataCount) : null;
                                     
+                                    var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
+                                    var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
+                                    
+                                    textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
                                     if (rowMean !== null) {
-                                        var interpretation = interpretNdvi(rowMean);
-                                        var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
-                                        var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
-                                        
-                                        textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
-                                        textParts.push("   NDVI Mean: " + rowMean.toFixed(3) + " (" + interpretation + ")");
-                                        if (rowMedian !== null) {
-                                            textParts.push("   Median: " + rowMedian.toFixed(3));
-                                        }
-                                        if (rowMin !== null && rowMax !== null) {
-                                            textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
-                                        }
-                                        if (rowSampleCount !== null) {
-                                            textParts.push("   SampleCount: " + rowSampleCount);
-                                        }
-                                        if (rowNoDataCount !== null) {
-                                            textParts.push("   NoDataCount: " + rowNoDataCount);
-                                        }
-                                        textParts.push(""); // Prazan red između podataka
+                                        textParts.push("   NDVI Mean: " + rowMean.toFixed(3) + " (" + interpretNdvi(rowMean) + ")");
+                                    } else {
+                                        textParts.push("   NDVI Mean: N/A (oblaci)");
                                     }
+                                    if (rowMedian !== null) textParts.push("   Median: " + rowMedian.toFixed(3));
+                                    if (rowMin !== null && rowMax !== null) textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
+                                    if (validni !== null) textParts.push("   Validni pikseli: " + validni);
+                                    if (rowNoDataCount > 0) textParts.push("   Pikseli prekriveni oblacima: " + rowNoDataCount);
+                                    textParts.push("");
                                 });
                             } else {
                                 textParts.push("CSV fajl je prazan (nema podataka).");
@@ -2800,51 +2851,41 @@
                         
                         // Za NDVI prikaži sve podatke
                         if (idxLabel === "NDVI") {
-                            // Sortiraj sve validne podatke od najnovijeg ka starijim
-                            var allGoodRows = rows.filter(function(row) {
-                                var cloud = toNumber(row["C0/cloudCoveragePercent"]);
-                                return cloud === null ? true : cloud < 80;
-                            }).filter(function(row) {
+                            var allRowsNdvi = rows.filter(function(row) {
                                 return row["C0/date"] && toNumber(row["C0/mean"]) !== null;
                             });
-                            
-                            // Sortiraj od najnovijeg ka starijim
-                            allGoodRows.sort(function(a, b) {
+                            allRowsNdvi.sort(function(a, b) {
                                 return new Date(b["C0/date"]).getTime() - new Date(a["C0/date"]).getTime();
                             });
                             
-                            if (allGoodRows.length > 0) {
+                            if (allRowsNdvi.length > 0) {
                                 textParts.push("<strong>Svi podaci (od najnovijeg ka starijim):</strong>");
-                                allGoodRows.forEach(function(row, idx) {
+                                var firstValid = allRowsNdvi.find(function(r) { return toNumber(r["C0/mean"]) !== null; });
+                                if (firstValid) setNdviLayerForParcel(parcelId, new Date(firstValid["C0/date"]).toISOString().split('T')[0]);
+                                allRowsNdvi.forEach(function(row, idx) {
                                     var rowDate = row["C0/date"];
                                     var rowMean = toNumber(row["C0/mean"]);
                                     var rowMedian = toNumber(row["C0/median"]);
                                     var rowMin = toNumber(row["C0/min"]);
                                     var rowMax = toNumber(row["C0/max"]);
                                     var rowSampleCount = toNumber(row["C0/sampleCount"]);
-                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]);
+                                    var rowNoDataCount = toNumber(row["C0/noDataCount"]) || 0;
+                                    var validni = (rowSampleCount !== null) ? (rowSampleCount - rowNoDataCount) : null;
                                     
+                                    var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
+                                    var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
+                                    
+                                    textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
                                     if (rowMean !== null) {
-                                        var interpretation = interpretNdvi(rowMean);
-                                        var dateStr = rowDate ? new Date(rowDate).toLocaleDateString("sr-RS") : "N/A";
-                                        var dateTimeStr = rowDate ? new Date(rowDate).toLocaleString("sr-RS") : "N/A";
-                                        
-                                        textParts.push((idx + 1) + ". " + dateStr + " (" + dateTimeStr + ")");
-                                        textParts.push("   NDVI Mean: " + rowMean.toFixed(3) + " (" + interpretation + ")");
-                                        if (rowMedian !== null) {
-                                            textParts.push("   Median: " + rowMedian.toFixed(3));
-                                        }
-                                        if (rowMin !== null && rowMax !== null) {
-                                            textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
-                                        }
-                                        if (rowSampleCount !== null) {
-                                            textParts.push("   SampleCount: " + rowSampleCount);
-                                        }
-                                        if (rowNoDataCount !== null) {
-                                            textParts.push("   NoDataCount: " + rowNoDataCount);
-                                        }
-                                        textParts.push(""); // Prazan red između podataka
+                                        textParts.push("   NDVI Mean: " + rowMean.toFixed(3) + " (" + interpretNdvi(rowMean) + ")");
+                                    } else {
+                                        textParts.push("   NDVI Mean: N/A (oblaci)");
                                     }
+                                    if (rowMedian !== null) textParts.push("   Median: " + rowMedian.toFixed(3));
+                                    if (rowMin !== null && rowMax !== null) textParts.push("   Min: " + rowMin.toFixed(3) + ", Max: " + rowMax.toFixed(3));
+                                    if (validni !== null) textParts.push("   Validni pikseli: " + validni);
+                                    if (rowNoDataCount > 0) textParts.push("   Pikseli prekriveni oblacima: " + rowNoDataCount);
+                                    textParts.push("");
                                 });
                             } else {
                                 // Fallback ako nema podataka
