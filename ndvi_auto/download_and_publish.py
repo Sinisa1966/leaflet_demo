@@ -13,6 +13,7 @@ PROCESS_URL = "https://sh.dataspace.copernicus.eu/api/v1/process"
 
 
 def load_env(env_path: Path) -> None:
+    """Učitava .env; NE prepisuje promenljive koje su već postavljene (npr. od parcel servera)."""
     if not env_path.exists():
         return
     for line in env_path.read_text(encoding="utf-8").splitlines():
@@ -21,6 +22,8 @@ def load_env(env_path: Path) -> None:
             continue
         key, value = line.split("=", 1)
         key = key.strip()
+        if key in os.environ:
+            continue  # Pozivatelj (parcel server itd.) već postavio – ne prepisuj
         value = value.strip().strip('"').strip("'")
         if value:
             os.environ[key] = value
@@ -32,6 +35,15 @@ def get_env(name: str, default=None, required: bool = False) -> str:
         print(f"[ERROR] Missing env var: {name}")
         sys.exit(1)
     return value
+
+
+def get_parcel_layer_suffix(parcel_id: str, kat_opstina: str | None) -> str:
+    """Vraća suffix za layer/store naziv: '1146' ili '1146_DUBOVAC' kad je KO setovan (Opština/KO/Parcela)."""
+    safe = parcel_id.replace("/", "_").replace("\\", "_")
+    if kat_opstina and kat_opstina.strip():
+        ko = kat_opstina.strip().upper().replace(" ", "_").replace("/", "_").replace("'", "")[:50]
+        safe = safe + "_" + ko
+    return safe
 
 
 def get_token(client_id: str, client_secret: str) -> str:
@@ -152,6 +164,37 @@ function evaluatePixel(sample) {
 """
 
 
+def build_evalscript_ndvi_value() -> str:
+    """Generiše raster sa sirovim NDVI vrednostima (FLOAT32) za GetFeatureInfo.
+    SCL filter 0,1,8,9 – kao CSV, da vrednosti pri kliku budu u opsegu Min-Max."""
+    return """//VERSION=3
+function setup() {
+  return {
+    input: ["B04", "B08", "SCL", "dataMask"],
+    output: { bands: 1, sampleType: "FLOAT32" }
+  };
+}
+
+function evaluatePixel(sample) {
+  if (sample.dataMask === 0) {
+    return [-999];
+  }
+  var scl = sample.SCL;
+  if (scl !== undefined && scl !== null) {
+    if (scl === 0 || scl === 1 || scl === 8 || scl === 9) {
+      return [-999];
+    }
+  }
+  var sum = sample.B04 + sample.B08;
+  if (sum <= 0 || !isFinite(sample.B04) || !isFinite(sample.B08)) {
+    return [-999];
+  }
+  var ndvi = (sample.B08 - sample.B04) / sum;
+  return isFinite(ndvi) ? [ndvi] : [-999];
+}
+"""
+
+
 def build_evalscript_ndmi() -> str:
     return """//VERSION=3
 function setup() {
@@ -208,10 +251,10 @@ function evaluatePixel(sample) {
 
 def build_evalscript_ndre() -> str:
     return """//VERSION=3
-// SCL: 0=no data, 1=saturated, 8=cloud medium, 9=cloud high
+// Isto kao NDVI/NDMI - bez SCL filtera da bi raster bio vidljiv (SCL može davati crno)
 function setup() {
   return {
-    input: ["B05", "B08", "SCL", "dataMask"],
+    input: ["B05", "B08", "dataMask"],
     output: { bands: 3, sampleType: "UINT8" }
   };
 }
@@ -219,13 +262,6 @@ function setup() {
 function evaluatePixel(sample) {
   if (sample.dataMask === 0) {
     return [0, 0, 0];
-  }
-  // Filtriraj oblake i loše piksele kao u CSV evalscriptu
-  var scl = sample.SCL;
-  if (scl !== undefined && scl !== null) {
-    if (scl === 0 || scl === 1 || scl === 8 || scl === 9) {
-      return [0, 0, 0];
-    }
   }
   let ndre = (sample.B08 - sample.B05) / (sample.B08 + sample.B05);
   
@@ -302,11 +338,11 @@ function evaluatePixel(sample) {
 
 
 def build_evalscript_ndre_zones() -> str:
+    """Ista struktura kao build_evalscript_ndre() - parcel NDRE radi bez SCL."""
     return """//VERSION=3
-// SCL: 0=no data, 1=saturated, 8=cloud medium, 9=cloud high
 function setup() {
   return {
-    input: ["B05", "B08", "SCL", "dataMask"],
+    input: ["B05", "B08", "dataMask"],
     output: { bands: 3, sampleType: "UINT8" }
   };
 }
@@ -315,14 +351,11 @@ function evaluatePixel(sample) {
   if (sample.dataMask === 0) {
     return [0, 0, 0];
   }
-  // Filtriraj oblake i loše piksele kao u CSV evalscriptu
-  var scl = sample.SCL;
-  if (scl !== undefined && scl !== null) {
-    if (scl === 0 || scl === 1 || scl === 8 || scl === 9) {
-      return [0, 0, 0];
-    }
+  var sum = sample.B08 + sample.B05;
+  if (sum <= 0 || !isFinite(sample.B08) || !isFinite(sample.B05)) {
+    return [0, 0, 0];
   }
-  let ndre = (sample.B08 - sample.B05) / (sample.B08 + sample.B05);
+  let ndre = (sample.B08 - sample.B05) / sum;
   
   // NDRE zone za azotnu prihranu:
   // Niska vrednost NDRE → biljke imaju više azota (tamnija vegetacija)
@@ -416,12 +449,43 @@ function evaluatePixel(sample) {
 
 
 
-def build_evalscript_ndre_value() -> str:
-    """Generiše raster sa sirovim NDRE vrednostima (FLOAT32) za GetFeatureInfo upite
-    Bez RGB konverzije ili stretching-a - vraća čiste NDRE vrednosti
-    """
+def build_evalscript_ndmi_value() -> str:
+    """Generiše raster sa sirovim NDMI vrednostima (FLOAT32) za GetFeatureInfo."""
     return """//VERSION=3
-// SCL: 0=no data, 1=saturated, 8=cloud medium, 9=cloud high
+function setup() {
+  return {
+    input: ["B08", "B11", "SCL", "dataMask"],
+    output: [
+      { id: "default", bands: 1, sampleType: "FLOAT32" },
+      { id: "dataMask", bands: 1 }
+    ]
+  };
+}
+
+function evaluatePixel(sample) {
+  if (sample.dataMask === 0) {
+    return { default: [0], dataMask: [0] };
+  }
+  var scl = sample.SCL;
+  if (scl !== undefined && scl !== null) {
+    if (scl === 0 || scl === 1 || scl === 8 || scl === 9) {
+      return { default: [0], dataMask: [0] };
+    }
+  }
+  var sum = sample.B08 + sample.B11;
+  if (sum <= 0 || !isFinite(sample.B08) || !isFinite(sample.B11)) {
+    return { default: [0], dataMask: [0] };
+  }
+  var ndmi = (sample.B08 - sample.B11) / sum;
+  return isFinite(ndmi) ? { default: [ndmi], dataMask: [1] } : { default: [0], dataMask: [0] };
+}
+"""
+
+
+def build_evalscript_ndre_value() -> str:
+    """Generiše raster sa sirovim NDRE vrednostima (FLOAT32) za GetFeatureInfo.
+    SCL filter kao u CSV – isključi oblake (0,1,8,9) da se ne prikazuju vrednosti vode (-0.06) umesto vegetacije."""
+    return """//VERSION=3
 function setup() {
   return {
     input: ["B05", "B08", "SCL", "dataMask"],
@@ -434,21 +498,20 @@ function setup() {
 
 function evaluatePixel(sample) {
   if (sample.dataMask === 0) {
-    return { default: [0], dataMask: [0] };
+    return { default: [-999], dataMask: [0] };
   }
-  // Filtriraj oblake i loše piksele kao u CSV evalscriptu
   var scl = sample.SCL;
   if (scl !== undefined && scl !== null) {
     if (scl === 0 || scl === 1 || scl === 8 || scl === 9) {
-      return { default: [0], dataMask: [0] };
+      return { default: [-999], dataMask: [0] };
     }
   }
   var sum = sample.B08 + sample.B05;
   if (sum <= 0 || !isFinite(sample.B08) || !isFinite(sample.B05)) {
-    return { default: [0], dataMask: [0] };
+    return { default: [-999], dataMask: [0] };
   }
   var ndre = (sample.B08 - sample.B05) / sum;
-  return isFinite(ndre) ? { default: [ndre], dataMask: [1] } : { default: [0], dataMask: [0] };
+  return isFinite(ndre) ? { default: [ndre], dataMask: [1] } : { default: [-999], dataMask: [0] };
 }
 """
 
@@ -491,13 +554,21 @@ def download_index(
     height: int,
     max_cloud: int,
     evalscript: str,
+    *,
+    bbox: list | None = None,
+    crs: str | None = None,
 ) -> bytes:
+    """Preuzmi raster. Ako su bbox i crs dati, koristi ih (npr. UTM); inače geometry u WGS84."""
+    if bbox is not None and crs is not None:
+        bounds = {"bbox": bbox, "properties": {"crs": crs}}
+    else:
+        bounds = {
+            "properties": {"crs": "http://www.opengis.net/def/crs/EPSG/0/4326"},
+            "geometry": geometry,
+        }
     payload = {
         "input": {
-            "bounds": {
-                "properties": {"crs": "http://www.opengis.net/def/crs/EPSG/0/4326"},
-                "geometry": geometry,
-            },
+            "bounds": bounds,
             "data": [
                 {
                     "type": "sentinel-2-l2a",
@@ -530,6 +601,35 @@ def download_index(
         sys.exit(1)
 
 
+def download_index_for_date(
+    token: str,
+    geometry: dict,
+    date_str: str,
+    width: int,
+    height: int,
+    max_cloud: int,
+    evalscript: str,
+    label: str,
+    *,
+    bbox: list | None = None,
+    crs: str | None = None,
+) -> tuple[bytes, str, str]:
+    """Preuzmi raster za tačan datum (npr. 2026-02-04) – isti snimak kao CSV."""
+    try:
+        d = dt.datetime.strptime(date_str.strip()[:10], "%Y-%m-%d")
+    except ValueError:
+        return None, "", ""
+    time_from = d.replace(tzinfo=dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    time_to = (d + dt.timedelta(days=1)).replace(tzinfo=dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    print(f"[INFO] Request {label} za datum {date_str} -> {time_from} do {time_to}")
+    kw = {}
+    if bbox is not None and crs is not None:
+        kw["bbox"] = bbox
+        kw["crs"] = crs
+    tiff_bytes = download_index(token, geometry, time_from, time_to, width, height, max_cloud, evalscript, **kw)
+    return tiff_bytes, time_from, time_to
+
+
 def download_with_fallback(
     token: str,
     geometry: dict,
@@ -542,13 +642,20 @@ def download_with_fallback(
     fallback_cloud: int,
     evalscript: str,
     label: str,
+    *,
+    bbox: list | None = None,
+    crs: str | None = None,
 ) -> tuple[bytes, str, str, bool]:
+    kw = {}
+    if bbox is not None and crs is not None:
+        kw["bbox"] = bbox
+        kw["crs"] = crs
     now = dt.datetime.utcnow()
     start = now - dt.timedelta(days=days_back)
     time_from = start.strftime("%Y-%m-%dT%H:%M:%SZ")
     time_to = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     print(f"[INFO] Request {label} {time_from} -> {time_to}")
-    tiff_bytes = download_index(token, geometry, time_from, time_to, width, height, max_cloud, evalscript)
+    tiff_bytes = download_index(token, geometry, time_from, time_to, width, height, max_cloud, evalscript, **kw)
     if len(tiff_bytes) >= min_bytes:
         return tiff_bytes, time_from, time_to, False
 
@@ -559,7 +666,7 @@ def download_with_fallback(
     start_fb = now - dt.timedelta(days=fallback_days)
     time_from_fb = start_fb.strftime("%Y-%m-%dT%H:%M:%SZ")
     time_to_fb = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-    tiff_fb = download_index(token, geometry, time_from_fb, time_to_fb, width, height, fallback_cloud, evalscript)
+    tiff_fb = download_index(token, geometry, time_from_fb, time_to_fb, width, height, fallback_cloud, evalscript, **kw)
     return tiff_fb, time_from_fb, time_to_fb, True
 
 

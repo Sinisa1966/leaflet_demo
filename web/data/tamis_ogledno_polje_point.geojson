@@ -1,0 +1,23 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Ogledno polje (koordinate iz poruke)",
+        "lat_dms": "44°56’21.8″N",
+        "lon_dms": "20°43’21.1″E",
+        "lat_dd": 44.939388889,
+        "lon_dd": 20.722527778,
+        "crs": "EPSG:4326"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527778,
+          44.939388889
+        ]
+      }
+    }
+  ]
+}

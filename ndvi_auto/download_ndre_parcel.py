@@ -4,9 +4,11 @@ from pathlib import Path
 from download_and_publish import (
     build_evalscript_ndre,
     compute_output_size,
+    download_index_for_date,
     download_with_fallback,
     geoserver_put,
     get_env,
+    get_parcel_layer_suffix,
     get_token,
     load_env,
 )
@@ -28,9 +30,11 @@ def main() -> None:
     parcel_layer = get_env("PARCEL_LAYER", "VrsacDKP")
     parcel_attr = get_env("PARCEL_ATTR", "brparcele")
     parcel_id = get_env("PARCEL_ID", "25991")
+    kat_opstina = get_env("PARCEL_KAT_OPSTINA", "").strip() or None
 
     minx, miny, maxx, maxy = fetch_parcel_bbox(
-        geoserver_url, workspace, parcel_layer, parcel_attr, parcel_id
+        geoserver_url, workspace, parcel_layer, parcel_attr, parcel_id,
+        kat_opstina=kat_opstina,
     )
     geometry = bbox_to_polygon(minx, miny, maxx, maxy)
     print(f"[INFO] Parcel {parcel_id} bbox: {minx}, {miny}, {maxx}, {maxy}")
@@ -50,23 +54,39 @@ def main() -> None:
     print(f"[INFO] Output size {width}x{height} (res {resolution_m}m, max {max_pixels}px)")
 
     token = get_token(client_id, client_secret)
-    ndre_bytes, ndre_from, ndre_to, ndre_fb = download_with_fallback(
-        token,
-        geometry,
-        days_back,
-        width,
-        height,
-        max_cloud,
-        min_bytes,
-        fallback_days,
-        fallback_cloud,
-        build_evalscript_ndre(),
-        f"NDRE_PARCEL_{parcel_id}",
-    )
+    parcel_date = get_env("PARCEL_DATE", "").strip()
+    evalscript = build_evalscript_ndre()
+    if parcel_date:
+        ndre_bytes, ndre_from, ndre_to = download_index_for_date(
+            token, geometry, parcel_date, width, height, max_cloud,
+            evalscript, f"NDRE_PARCEL_{parcel_id}",
+        )
+        ndre_fb = False
+        if ndre_bytes is None or len(ndre_bytes) < min_bytes:
+            print(f"[WARN] Nema dovoljno podataka za datum {parcel_date}, koristim mostRecent")
+            ndre_bytes, ndre_from, ndre_to, ndre_fb = download_with_fallback(
+                token, geometry, days_back, width, height,
+                max_cloud, min_bytes, fallback_days, fallback_cloud,
+                evalscript, f"NDRE_PARCEL_{parcel_id}",
+            )
+    else:
+        ndre_bytes, ndre_from, ndre_to, ndre_fb = download_with_fallback(
+            token,
+            geometry,
+            days_back,
+            width,
+            height,
+            max_cloud,
+            min_bytes,
+            fallback_days,
+            fallback_cloud,
+            evalscript,
+            f"NDRE_PARCEL_{parcel_id}",
+        )
 
     output_dir = Path(get_env("OUTPUT_DIR", str(script_dir / "data")))
     output_dir.mkdir(parents=True, exist_ok=True)
-    safe_parcel_id = parcel_id.replace("/", "_").replace("\\", "_")
+    safe_parcel_id = get_parcel_layer_suffix(parcel_id, kat_opstina)
     output_name = get_env("OUTPUT_FILENAME_NDRE_PARCEL", f"ndre_parcel_{safe_parcel_id}.tif")
     output_path = output_dir / output_name
     output_path.write_bytes(ndre_bytes)

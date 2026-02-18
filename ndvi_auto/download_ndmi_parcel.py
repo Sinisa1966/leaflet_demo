@@ -4,9 +4,11 @@ from pathlib import Path
 from download_and_publish import (
     build_evalscript_ndmi,
     compute_output_size,
+    download_index_for_date,
     download_with_fallback,
     geoserver_put,
     get_env,
+    get_parcel_layer_suffix,
     get_token,
     load_env,
 )
@@ -28,9 +30,11 @@ def main() -> None:
     parcel_layer = get_env("PARCEL_LAYER", "VrsacDKP")
     parcel_attr = get_env("PARCEL_ATTR", "brparcele")
     parcel_id = get_env("PARCEL_ID", "25991")
+    kat_opstina = get_env("PARCEL_KAT_OPSTINA", "").strip() or None
 
     minx, miny, maxx, maxy = fetch_parcel_bbox(
-        geoserver_url, workspace, parcel_layer, parcel_attr, parcel_id
+        geoserver_url, workspace, parcel_layer, parcel_attr, parcel_id,
+        kat_opstina=kat_opstina,
     )
     geometry = bbox_to_polygon(minx, miny, maxx, maxy)
     print(f"[INFO] Parcel {parcel_id} bbox: {minx}, {miny}, {maxx}, {maxy}")
@@ -50,19 +54,35 @@ def main() -> None:
     print(f"[INFO] Output size {width}x{height} (res {resolution_m}m, max {max_pixels}px)")
 
     token = get_token(client_id, client_secret)
-    ndmi_bytes, ndmi_from, ndmi_to, ndmi_fb = download_with_fallback(
-        token,
-        geometry,
-        days_back,
-        width,
-        height,
-        max_cloud,
-        min_bytes,
-        fallback_days,
-        fallback_cloud,
-        build_evalscript_ndmi(),
-        f"NDMI_PARCEL_{parcel_id}",
-    )
+    parcel_date = get_env("PARCEL_DATE", "").strip()
+    evalscript = build_evalscript_ndmi()
+    if parcel_date:
+        ndmi_bytes, ndmi_from, ndmi_to = download_index_for_date(
+            token, geometry, parcel_date, width, height, max_cloud,
+            evalscript, f"NDMI_PARCEL_{parcel_id}",
+        )
+        ndmi_fb = False
+        if ndmi_bytes is None or len(ndmi_bytes) < min_bytes:
+            print(f"[WARN] Nema dovoljno podataka za datum {parcel_date}, koristim mostRecent")
+            ndmi_bytes, ndmi_from, ndmi_to, ndmi_fb = download_with_fallback(
+                token, geometry, days_back, width, height,
+                max_cloud, min_bytes, fallback_days, fallback_cloud,
+                evalscript, f"NDMI_PARCEL_{parcel_id}",
+            )
+    else:
+        ndmi_bytes, ndmi_from, ndmi_to, ndmi_fb = download_with_fallback(
+            token,
+            geometry,
+            days_back,
+            width,
+            height,
+            max_cloud,
+            min_bytes,
+            fallback_days,
+            fallback_cloud,
+            evalscript,
+            f"NDMI_PARCEL_{parcel_id}",
+        )
 
     # Isto kao NDVI: satelite/ kad nije Docker, inače OUTPUT_DIR ili data
     if Path("/.dockerenv").exists() and Path("/app/data").exists():
@@ -71,7 +91,7 @@ def main() -> None:
         default_dir = str((script_dir.parent / "satelite").resolve())
     output_dir = Path(get_env("OUTPUT_DIR", default_dir))
     output_dir.mkdir(parents=True, exist_ok=True)
-    safe_parcel_id = parcel_id.replace("/", "_").replace("\\", "_")
+    safe_parcel_id = get_parcel_layer_suffix(parcel_id, kat_opstina)
     output_name = get_env("OUTPUT_FILENAME_NDMI_PARCEL", f"ndmi_parcel_{safe_parcel_id}.tif")
     output_path = output_dir / output_name
     output_path.write_bytes(ndmi_bytes)

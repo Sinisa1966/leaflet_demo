@@ -1,15 +1,11 @@
-import csv
-import datetime as dt
-import json
 import sys
-import urllib.parse
-import urllib.request
 from pathlib import Path
 
-from download_and_publish import get_env, get_token, load_env
+from download_and_publish import get_env, get_parcel_layer_suffix, get_token, load_env
 from download_ndvi_parcel_csv import (
     fetch_parcel_geometry,
-    pick_output_band,
+    get_latest_date_and_criterion,
+    get_row_metadata_for_date,
     post_stats,
     stats_to_rows,
     time_range_midnight_utc,
@@ -44,93 +40,6 @@ function evaluatePixel(sample) {
 """
 
 
-def _geometry_to_utm_bbox(geometry: dict) -> tuple[list, str]:
-    """Vraća (bbox, crs) u UTM za Srbiju (zone 34N)."""
-    from rasterio.warp import transform_geom
-    geom_utm = transform_geom("EPSG:4326", "EPSG:32634", geometry)
-    coords = geom_utm.get("coordinates", [])
-    if geom_utm.get("type") == "Polygon":
-        ring = coords[0]
-    elif geom_utm.get("type") == "MultiPolygon":
-        ring = coords[0][0]
-    else:
-        ring = []
-    xs = [p[0] for p in ring]
-    ys = [p[1] for p in ring]
-    return [min(xs), min(ys), max(xs), max(ys)], "http://www.opengis.net/def/crs/EPSG/0/32634"
-
-
-def post_stats_ndre(token: str, geometry: dict, date_from: str, date_to: str, max_cloud: int, res_m: float) -> dict:
-    bbox, crs = _geometry_to_utm_bbox(geometry)
-    payload = {
-        "input": {
-            "bounds": {"bbox": bbox, "properties": {"crs": crs}},
-            "data": [
-                {
-                    "type": "sentinel-2-l2a",
-                    "dataFilter": {"maxCloudCoverage": max_cloud},
-                }
-            ],
-        },
-        "aggregation": {
-            "timeRange": {"from": date_from, "to": date_to},
-            "aggregationInterval": {"of": "P1D"},
-            "evalscript": build_evalscript_ndre_stats(),
-            "resx": res_m,
-            "resy": res_m,
-        },
-        "calculations": {
-            "default": {
-                "statistics": {
-                    "default": {
-                        "percentiles": {"k": [10, 50, 90]},
-                    }
-                }
-            }
-        },
-    }
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request("https://sh.dataspace.copernicus.eu/api/v1/statistics", data=data, method="POST")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("Authorization", f"Bearer {token}")
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"Stats API error {exc.code}: {detail}") from exc
-
-
-def stats_to_rows_ndre(payload: dict) -> list[dict]:
-    rows = []
-    for item in payload.get("data", []):
-        interval = item.get("interval") or {}
-        date_value = interval.get("from") or ""
-        band = pick_output_band(item.get("outputs") or {})
-        stats = band.get("stats") or {}
-        percentiles = band.get("percentiles") or {}
-        row = {
-            "C0/date": date_value,
-            "C0/min": stats.get("min"),
-            "C0/max": stats.get("max"),
-            "C0/mean": stats.get("mean"),
-            "C0/stDev": stats.get("stDev") or stats.get("stdDev"),
-            "C0/sampleCount": stats.get("sampleCount") or band.get("sampleCount"),
-            "C0/noDataCount": stats.get("noDataCount") or band.get("noDataCount"),
-            "C0/median": percentiles.get("p50") or percentiles.get("50"),
-            "C0/p10": percentiles.get("p10") or percentiles.get("10"),
-            "C0/p90": percentiles.get("p90") or percentiles.get("90"),
-            "C0/cloudCoveragePercent": None,
-        }
-        quality = item.get("qualityIndicators") or {}
-        if "cloudCoverage" in quality:
-            row["C0/cloudCoveragePercent"] = quality.get("cloudCoverage")
-        elif "cloudCoveragePercent" in quality:
-            row["C0/cloudCoveragePercent"] = quality.get("cloudCoveragePercent")
-        rows.append(row)
-    return rows
-
-
 def main() -> None:
     script_dir = Path(__file__).resolve().parent
     load_env(script_dir / ".env")
@@ -143,25 +52,35 @@ def main() -> None:
     parcel_layer = get_env("PARCEL_LAYER", "VrsacDKP")
     parcel_attr = get_env("PARCEL_ATTR", "brparcele")
     parcel_id = get_env("PARCEL_ID", "25991")
+    kat_opstina = get_env("PARCEL_KAT_OPSTINA", "").strip() or None
 
     days_back = int(get_env("PARCEL_DAYS_BACK", "30"))
     max_cloud = int(get_env("PARCEL_MAX_CLOUD", "80"))
-    stats_res_m = float(get_env("PARCEL_STATS_RES", "10"))  # 10m - UTM bbox daje prave piksel statistike
+    stats_res_m = float(get_env("PARCEL_STATS_RES", "10"))
 
-    geometry = fetch_parcel_geometry(geoserver_url, workspace, parcel_layer, parcel_attr, parcel_id)
+    geometry = fetch_parcel_geometry(geoserver_url, workspace, parcel_layer, parcel_attr, parcel_id, kat_opstina=kat_opstina)
     date_from, date_to = time_range_midnight_utc(days_back)
     print(f"[INFO] Requesting NDRE stats from {date_from} to {date_to} (last {days_back} days, max cloud {max_cloud}%)")
-    payload = post_stats_ndre(
+
+    # Koristi ISTI post_stats kao NDVI – samo sa NDRE evalscript-om
+    payload = post_stats(
         get_token(client_id, client_secret),
         geometry,
         date_from,
         date_to,
         max_cloud,
         stats_res_m,
+        evalscript=build_evalscript_ndre_stats(),
+        label="NDRE",
     )
     print(f"[INFO] Received {len(payload.get('data', []))} data items from API")
-    rows = stats_to_rows_ndre(payload)
+    rows = stats_to_rows(payload)
     print(f"[INFO] Converted to {len(rows)} CSV rows")
+    # Debug: prikaži sampleCount za prvih nekoliko redova
+    if rows:
+        print(f"[DEBUG] Prvih 3 reda sampleCount:")
+        for i, row in enumerate(rows[:3]):
+            print(f"  {i+1}. Date: {row.get('C0/date', 'N/A')}, sampleCount: {row.get('C0/sampleCount', 'N/A')}, mean: {row.get('C0/mean', 'N/A')}")
 
     # Isto kao NDVI: satelite/ kad nije Docker, inače PARCEL_CSV_DIR ili /app/data
     if Path("/.dockerenv").exists() and Path("/app/data").exists():
@@ -170,11 +89,22 @@ def main() -> None:
         default_dir = str((script_dir.parent / "satelite").resolve())
     output_dir = Path(get_env("PARCEL_CSV_DIR", get_env("OUTPUT_DIR", default_dir)))
     output_dir.mkdir(parents=True, exist_ok=True)
-    safe_parcel_id = parcel_id.replace("/", "_").replace("\\", "_")
+    safe_parcel_id = get_parcel_layer_suffix(parcel_id, kat_opstina)
     output_path = output_dir / f"parcela_{safe_parcel_id}_NDRE.csv"
     write_csv(rows, output_path)
     print(f"[INFO] Saved parcel NDRE CSV: {output_path}")
-    # Proveri da li fajl zaista postoji
+    latest_date, latest_criterion = get_latest_date_and_criterion(rows)
+    if latest_date:
+        print(f"LATEST_DATE={latest_date}")
+    if latest_criterion:
+        print(f"LATEST_CRITERION={latest_criterion}")
+    meta = get_row_metadata_for_date(rows, latest_date) if latest_date else None
+    if meta:
+        print(f"LATEST_VALID_PIXELS={meta['valid_pixels']}")
+        print(f"LATEST_TOTAL_PIXELS={meta['total_pixels']}")
+        print(f"LATEST_VALID_PCT={meta['valid_pct']}")
+        if meta.get("cloud_pct") is not None:
+            print(f"LATEST_CLOUD_PCT={meta['cloud_pct']}")
     if output_path.exists():
         print(f"[INFO] CSV fajl sacuvan: {output_path} ({output_path.stat().st_size} bytes)")
     else:

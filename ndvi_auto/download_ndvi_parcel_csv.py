@@ -1,13 +1,14 @@
 import csv
 import datetime as dt
 import json
+import math
 import os
 import sys
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from download_and_publish import get_env, get_token, load_env
+from download_and_publish import get_env, get_parcel_layer_suffix, get_token, load_env
 
 
 STATS_URL = "https://sh.dataspace.copernicus.eu/api/v1/statistics"
@@ -19,24 +20,36 @@ def fetch_parcel_geometry(
     layer: str,
     parcel_attr: str,
     parcel_id: str,
+    *,
+    kat_opstina: str | None = None,
 ) -> dict:
-    cql = f"{parcel_attr}='{parcel_id}'"
-    params = {
-        "service": "WFS",
-        "version": "1.0.0",
-        "request": "GetFeature",
-        "typeName": f"{workspace}:{layer}",
-        "outputFormat": "application/json",
-        "srsName": "EPSG:4326",
-        "CQL_FILTER": cql,
-    }
-    url = f"{geoserver_url.rstrip('/')}/{workspace}/ows?{urllib.parse.urlencode(params)}"
-    with urllib.request.urlopen(url, timeout=60) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-    features = data.get("features", [])
-    if not features:
-        raise RuntimeError(f"Parcel {parcel_id} not found in {workspace}:{layer}")
-    return features[0]["geometry"]
+    """Dohvata geometriju parcele iz GeoServer WFS. Ako KO filter ne pronađe ništa, pokušava bez njega."""
+    safe_id = parcel_id.replace("'", "''")
+    cql_variants = [f"{parcel_attr}='{safe_id}'"]
+    if kat_opstina and kat_opstina.strip():
+        safe_kat = kat_opstina.strip().replace("'", "''")
+        cql_variants.insert(0, f"{parcel_attr}='{safe_id}' AND kat_opst_1 ILIKE '{safe_kat}'")
+        cql_variants.append(f"{parcel_attr}='{safe_id}' AND ImeKOLatV ILIKE '{safe_kat}'")
+    for cql in cql_variants:
+        params = {
+            "service": "WFS",
+            "version": "1.0.0",
+            "request": "GetFeature",
+            "typeName": f"{workspace}:{layer}",
+            "outputFormat": "application/json",
+            "srsName": "EPSG:4326",
+            "CQL_FILTER": cql,
+        }
+        url = f"{geoserver_url.rstrip('/')}/{workspace}/ows?{urllib.parse.urlencode(params)}"
+        try:
+            with urllib.request.urlopen(url, timeout=60) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            continue
+        features = data.get("features", [])
+        if features:
+            return features[0]["geometry"]
+    raise RuntimeError(f"Parcel {parcel_id} not found in {workspace}:{layer}")
 
 
 def build_evalscript_ndvi_stats() -> str:
@@ -98,7 +111,18 @@ def _geometry_to_utm_bbox(geometry: dict) -> tuple[list, str]:
     return [min(xs), min(ys), max(xs), max(ys)], "http://www.opengis.net/def/crs/EPSG/0/32634"
 
 
-def post_stats(token: str, geometry: dict, date_from: str, date_to: str, max_cloud: int, res_m: float) -> dict:
+def post_stats(token: str, geometry: dict, date_from: str, date_to: str, max_cloud: int, res_m: float, evalscript=None, label: str = "NDVI") -> dict:
+    """Poziva Sentinel Hub Statistics API.
+
+    Parameters
+    ----------
+    evalscript : str | None
+        Evalscript za statistiku.  Ako nije prosleđen koristi se podrazumevani NDVI.
+    label : str
+        Oznaka za debug ispis (NDVI / NDMI / NDRE).
+    """
+    if evalscript is None:
+        evalscript = build_evalscript_ndvi_stats()
     bbox, crs = _geometry_to_utm_bbox(geometry)
     payload = {
         "input": {
@@ -113,7 +137,7 @@ def post_stats(token: str, geometry: dict, date_from: str, date_to: str, max_clo
         "aggregation": {
             "timeRange": {"from": date_from, "to": date_to},
             "aggregationInterval": {"of": "P1D"},
-            "evalscript": build_evalscript_ndvi_stats(),
+            "evalscript": evalscript,
             "resx": res_m,
             "resy": res_m,
         },
@@ -128,29 +152,35 @@ def post_stats(token: str, geometry: dict, date_from: str, date_to: str, max_clo
         },
     }
     data = json.dumps(payload).encode("utf-8")
-    print(f"[DEBUG] Stats API payload - resx: {res_m}m, resy: {res_m}m")
+    print(f"[DEBUG] {label} Stats API payload - resx: {res_m}m, resy: {res_m}m, bbox: {bbox}")
     req = urllib.request.Request(STATS_URL, data=data, method="POST")
     req.add_header("Content-Type", "application/json")
     req.add_header("Authorization", f"Bearer {token}")
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
             result = json.loads(resp.read().decode("utf-8"))
-            # Debug: prikaži detaljne informacije iz prvog odgovora
-            if result.get("data"):
-                first_item = result["data"][0]
+            # Debug: prikaži detaljne informacije iz odgovora
+            data_items = result.get("data", [])
+            print(f"[DEBUG] {label} API vratio {len(data_items)} data stavki")
+            if data_items:
+                first_item = data_items[0]
                 outputs = first_item.get("outputs", {})
                 if outputs:
                     band = pick_output_band(outputs)
                     stats = band.get("stats", {})
                     sample_count = stats.get("sampleCount") or band.get("sampleCount")
                     no_data_count = stats.get("noDataCount") or band.get("noDataCount")
-                    print(f"[DEBUG] API odgovor - sampleCount: {sample_count}, noDataCount: {no_data_count}")
-                    print(f"[DEBUG] Stats keys: {list(stats.keys())}")
-                    print(f"[DEBUG] Band keys: {list(band.keys())}")
+                    print(f"[DEBUG] {label} API odgovor - sampleCount: {sample_count}, noDataCount: {no_data_count}")
+                    print(f"[DEBUG] {label} Stats keys: {list(stats.keys())}")
+                    print(f"[DEBUG] {label} Band keys: {list(band.keys())}")
+                else:
+                    print(f"[DEBUG] {label} API odgovor - outputs prazan: {first_item}")
+            else:
+                print(f"[DEBUG] {label} API vratio prazan data niz! Odgovor: {json.dumps(result)[:500]}")
             return result
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"Stats API error {exc.code}: {detail}") from exc
+        raise RuntimeError(f"{label} Stats API error {exc.code}: {detail}") from exc
 
 
 def pick_output_band(outputs: dict) -> dict:
@@ -163,6 +193,17 @@ def pick_output_band(outputs: dict) -> dict:
     return next(iter(bands.values()))
 
 
+def _is_valid_number(value) -> bool:
+    """Vraća True ako je vrednost validan (ne-NaN) broj."""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return value.strip().lower() not in ("nan", "inf", "-inf", "")
+    if isinstance(value, (int, float)) and (math.isnan(float(value)) or math.isinf(float(value))):
+        return False
+    return True
+
+
 def stats_to_rows(payload: dict) -> list[dict]:
     rows = []
     for item in payload.get("data", []):
@@ -171,11 +212,15 @@ def stats_to_rows(payload: dict) -> list[dict]:
         band = pick_output_band(item.get("outputs") or {})
         stats = band.get("stats") or {}
         percentiles = band.get("percentiles") or {}
+        mean_val = stats.get("mean")
+        # Preskoči datume gde su svi pikseli noData (mean je NaN)
+        if not _is_valid_number(mean_val):
+            continue
         row = {
             "C0/date": date_value,
             "C0/min": stats.get("min"),
             "C0/max": stats.get("max"),
-            "C0/mean": stats.get("mean"),
+            "C0/mean": mean_val,
             "C0/stDev": stats.get("stDev") or stats.get("stdDev"),
             "C0/sampleCount": stats.get("sampleCount") or band.get("sampleCount"),
             "C0/noDataCount": stats.get("noDataCount") or band.get("noDataCount"),
@@ -191,6 +236,112 @@ def stats_to_rows(payload: dict) -> list[dict]:
             row["C0/cloudCoveragePercent"] = quality.get("cloudCoveragePercent")
         rows.append(row)
     return rows
+
+
+# Kriterijumi za "poslednji validan datum" (Sentinel-2) – prioritet u %
+# % kriterijum omogućava i male i velike parcele. Minimalan broj px štiti od šuma.
+# NDVI/NDRE: prag može biti niži (≥40–50%); NDMI: bolje strože (≥60%) jer oblaci utiču na SWIR.
+MIN_VALID_PCT_STRICT = 0.60   # ≥60% (pogodno i za NDMI)
+MIN_VALID_PCT_STRONG = 0.50   # ≥50% (preporuka, precizna poljoprivreda)
+MIN_VALID_PCT_RELAXED = 0.40  # ≥40% (NDVI/NDRE trendovi; za NDMI koristiti oprezno)
+MIN_VALID_PX_FLOOR = 10       # minimalan broj px (za male parcele); % je glavni kriterijum
+
+CRITERION_STRICT = "≥60% validnih (min 10 px, pogodno i za NDMI)"
+CRITERION_STRONG = "≥50% validnih (min 10 px, preporuka)"
+CRITERION_RELAXED = "≥40% validnih (min 10 px, prihvatljivo za trendove)"
+
+
+def _valid_pixels(row: dict) -> tuple[int, int]:
+    """Vraća (validni_pikseli, ukupno). validni = sampleCount - noDataCount."""
+    try:
+        sc = row.get("C0/sampleCount")
+        nd = row.get("C0/noDataCount")
+        total = int(float(sc)) if sc is not None and str(sc).strip() else 0
+        no_data = int(float(nd)) if nd is not None and str(nd).strip() else 0
+    except (TypeError, ValueError):
+        return 0, 0
+    valid = max(0, total - no_data)
+    return valid, total
+
+
+def get_row_metadata_for_date(rows: list[dict], date_yyyymmdd: str) -> dict | None:
+    """Za dati datum (YYYY-MM-DD) vraća metapodatke scene: valid_pixels, total_pixels, valid_pct, cloud_pct."""
+    for row in rows:
+        d = row.get("C0/date") or ""
+        if str(d).startswith(date_yyyymmdd):
+            valid, total = _valid_pixels(row)
+            valid_pct = round(100 * valid / total, 1) if total else 0
+            cloud = row.get("C0/cloudCoveragePercent")
+            if cloud is not None:
+                try:
+                    v = float(cloud)
+                    cloud_pct = round(100 * v, 1) if 0 <= v <= 1 else round(v, 1)
+                except (TypeError, ValueError):
+                    cloud_pct = None
+            else:
+                cloud_pct = None
+            return {
+                "valid_pixels": valid,
+                "total_pixels": total,
+                "valid_pct": valid_pct,
+                "cloud_pct": cloud_pct,
+            }
+    return None
+
+
+def get_latest_date_and_criterion(
+    rows: list[dict],
+    min_pct_strict: float = MIN_VALID_PCT_STRICT,
+    min_pct_strong: float = MIN_VALID_PCT_STRONG,
+    min_pct_relaxed: float = MIN_VALID_PCT_RELAXED,
+    min_px_floor: int = MIN_VALID_PX_FLOOR,
+) -> tuple[str | None, str | None]:
+    """Iz liste redova (Stats API) vraća (datum YYYY-MM-DD, kriterijum_tekst).
+    Kriterijum je u % (60%, 50%, 40%) sa minimalnim brojem px – radi i za male i velike parcele."""
+    with_date = [r for r in rows if r.get("C0/date")]
+    with_date.sort(key=lambda r: r["C0/date"], reverse=True)
+    for row in with_date:
+        valid, total = _valid_pixels(row)
+        if total <= 0:
+            continue
+        pct = valid / total
+        if valid >= min_px_floor and pct >= min_pct_strict:
+            return str(row["C0/date"]).split("T")[0], CRITERION_STRICT
+    for row in with_date:
+        valid, total = _valid_pixels(row)
+        if total <= 0:
+            continue
+        pct = valid / total
+        if valid >= min_px_floor and pct >= min_pct_strong:
+            return str(row["C0/date"]).split("T")[0], CRITERION_STRONG
+    for row in with_date:
+        valid, total = _valid_pixels(row)
+        if total <= 0:
+            continue
+        pct = valid / total
+        if valid >= min_px_floor and pct >= min_pct_relaxed:
+            return str(row["C0/date"]).split("T")[0], CRITERION_RELAXED
+    return None, None
+
+
+def get_latest_date_with_data(
+    token: str,
+    geometry: dict,
+    days_back: int,
+    max_cloud: int,
+    evalscript: str | None = None,
+    label: str = "STATS",
+    res_m: float = 10.0,
+) -> tuple[str | None, str | None]:
+    """Vraća (poslednji_validan_datum YYYY-MM-DD, kriterijum_tekst).
+    Redom: 60%+ (NDMI), 50%+ (standard), 40%+ (trendovi)."""
+    date_from, date_to = time_range_midnight_utc(days_back)
+    payload = post_stats(
+        token, geometry, date_from, date_to, max_cloud, res_m,
+        evalscript=evalscript, label=label,
+    )
+    rows = stats_to_rows(payload)
+    return get_latest_date_and_criterion(rows)
 
 
 def write_csv(rows: list[dict], output_path: Path) -> None:
@@ -226,15 +377,16 @@ def main() -> None:
     parcel_layer = get_env("PARCEL_LAYER", "VrsacDKP")
     parcel_attr = get_env("PARCEL_ATTR", "brparcele")
     parcel_id = get_env("PARCEL_ID", "25991")
+    kat_opstina = get_env("PARCEL_KAT_OPSTINA", "").strip() or None
 
     days_back = int(get_env("PARCEL_DAYS_BACK", "30"))
     max_cloud = int(get_env("PARCEL_MAX_CLOUD", "80"))
     stats_res_m = float(get_env("PARCEL_STATS_RES", "10"))  # 10m - stvarne vrednosti Sentinel-2
 
-    geometry = fetch_parcel_geometry(geoserver_url, workspace, parcel_layer, parcel_attr, parcel_id)
+    geometry = fetch_parcel_geometry(geoserver_url, workspace, parcel_layer, parcel_attr, parcel_id, kat_opstina=kat_opstina)
 
     date_from, date_to = time_range_midnight_utc(days_back)
-    print(f"[INFO] Requesting stats from {date_from} to {date_to} (last {days_back} days, max cloud {max_cloud}%)")
+    print(f"[INFO] Requesting NDVI stats from {date_from} to {date_to} (last {days_back} days, max cloud {max_cloud}%)")
     payload = post_stats(
         get_token(client_id, client_secret),
         geometry,
@@ -242,6 +394,7 @@ def main() -> None:
         date_to,
         max_cloud,
         stats_res_m,
+        label="NDVI",
     )
     print(f"[INFO] Received {len(payload.get('data', []))} data items from API")
     rows = stats_to_rows(payload)
@@ -259,7 +412,7 @@ def main() -> None:
         default_dir = str((script_dir.parent / "satelite").resolve())
     output_dir = Path(get_env("PARCEL_CSV_DIR", get_env("OUTPUT_DIR", default_dir)))
     output_dir.mkdir(parents=True, exist_ok=True)
-    safe_parcel_id = parcel_id.replace("/", "_").replace("\\", "_")
+    safe_parcel_id = get_parcel_layer_suffix(parcel_id, kat_opstina)
     output_path = output_dir / f"parcela_{safe_parcel_id}_NDVI.csv"
     write_csv(rows, output_path)
     print(f"[INFO] Saved parcel NDVI CSV: {output_path}")

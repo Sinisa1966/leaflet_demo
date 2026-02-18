@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kopernikus GIS - Parcela 1427/2</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Chart.js + date adapter za vremensku x osu -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1>🌾 Kopernikus GIS - Analiza Parcele</h1>
+            <p class="subtitle">Satelitski monitoring poljoprivrednih parcela</p>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Parcel Info Card -->
+        <div class="card parcel-info">
+            <h2>📍 Parcela 1427/2</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="label">Opština:</span>
+                    <span class="value" id="municipality">Kovin</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Površina:</span>
+                    <span class="value" id="area">0.5 ha</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Zadnje merenje:</span>
+                    <span class="value" id="lastUpdate">4. februar 2026.</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Broj merenja:</span>
+                    <span class="value" id="totalMeasurements">22</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Index Selector -->
+        <div class="card">
+            <h3>Izaberi Indeks:</h3>
+            <div class="index-selector">
+                <button class="index-btn active" data-index="NDRE">
+                    <span class="icon">🌱</span>
+                    <span class="name">NDRE</span>
+                    <span class="desc">Red Edge</span>
+                </button>
+                <button class="index-btn" data-index="NDVI">
+                    <span class="icon">🌿</span>
+                    <span class="name">NDVI</span>
+                    <span class="desc">Vegetacija</span>
+                </button>
+                <button class="index-btn" data-index="NDMI">
+                    <span class="icon">💧</span>
+                    <span class="name">NDMI</span>
+                    <span class="desc">Vlaga</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Map and Stats Grid -->
+        <div class="grid-2col">
+            <!-- Map Card -->
+            <div class="card">
+                <h3>🗺️ Mapa Parcele</h3>
+                <div id="map"></div>
+                <div class="index-opacity-panel" id="indexOpacityPanel">
+                    <div class="opacity-slider">
+                        <label>NDVI — transparentnost</label>
+                        <input type="range" id="ndviOpacity" min="0" max="100" value="30">
+                    </div>
+                    <div class="opacity-slider">
+                        <label>NDMI — transparentnost</label>
+                        <input type="range" id="ndmiOpacity" min="0" max="100" value="0">
+                    </div>
+                    <div class="opacity-slider">
+                        <label>NDRE — transparentnost</label>
+                        <input type="range" id="ndreOpacity" min="0" max="100" value="0">
+                    </div>
+                </div>
+                <div class="map-legend" id="mapLegend">
+                    <h4>NDRE Zone:</h4>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: #FF4444"></span>
+                        <span>Problematična (&lt; 0.14)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: #FFD700"></span>
+                        <span>Umerena (0.14 - 0.19)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: #44FF44"></span>
+                        <span>Dobra (≥ 0.19)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Stats Card -->
+            <div class="card">
+                <h3>📊 Trenutno Stanje</h3>
+                <div id="currentStats" class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Prosečna Vrednost</div>
+                        <div class="stat-value" id="statMean">0.168</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Minimum</div>
+                        <div class="stat-value" id="statMin">0.105</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Maximum</div>
+                        <div class="stat-value" id="statMax">0.255</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Std Deviacija</div>
+                        <div class="stat-value" id="statStd">0.024</div>
+                    </div>
+                </div>
+                
+                <div class="zone-distribution" id="zoneDistribution">
+                    <h4>Distribucija Zona:</h4>
+                    <div class="zone-bar">
+                        <div class="zone-segment red" style="width: 15%">
+                            <span>15%</span>
+                        </div>
+                        <div class="zone-segment yellow" style="width: 60%">
+                            <span>60%</span>
+                        </div>
+                        <div class="zone-segment green" style="width: 25%">
+                            <span>25%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Time Series Chart -->
+        <div class="card">
+            <h3>📈 Vremenska Serija (Poslednjih 5 godina)</h3>
+            <div class="chart-container" style="position: relative; height: 350px;">
+                <canvas id="timeSeriesChart"></canvas>
+            </div>
+            <div class="chart-actions">
+                <button type="button" id="downloadTimeSeriesBtn" class="btn btn-primary">Download</button>
+            </div>
+        </div>
+
+        <!-- Recommendations Card -->
+        <div class="card recommendations" id="recommendations">
+            <h3>💡 Preporuke za Akciju</h3>
+            <div class="recommendation-list">
+                <div class="recommendation-item red-zone">
+                    <span class="icon">⚠️</span>
+                    <div>
+                        <strong>Crvena Zona (15%):</strong>
+                        <p>Dodaj više azota. NDRE vrednosti ispod 0.14 ukazuju na deficit azota.</p>
+                    </div>
+                </div>
+                <div class="recommendation-item yellow-zone">
+                    <span class="icon">✅</span>
+                    <div>
+                        <strong>Žuta Zona (60%):</strong>
+                        <p>Standardna obrada. NDRE u optimalnom opsegu 0.14-0.19.</p>
+                    </div>
+                </div>
+                <div class="recommendation-item green-zone">
+                    <span class="icon">🌟</span>
+                    <div>
+                        <strong>Zelena Zona (25%):</strong>
+                        <p>Može manje azota. NDRE ≥ 0.19 pokazuje dobro zdravlje useva.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="card">
+            <h3>📋 Istorija Merenja</h3>
+            <div class="table-responsive">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th>Datum</th>
+                            <th>Indeks</th>
+                            <th>Prosek</th>
+                            <th>Min</th>
+                            <th>Max</th>
+                            <th>Validni Pikseli</th>
+                            <th>Oblaci</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTableBody">
+                        <tr>
+                            <td colspan="7" class="loading">Učitavanje podataka...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>© 2026 Kopernikus GIS | Powered by Sentinel-2 & Supabase</p>
+            <p class="small">Data source: Copernicus DataSpace Ecosystem</p>
+        </div>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Učitavanje podataka...</p>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

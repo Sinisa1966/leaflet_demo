@@ -1,0 +1,2 @@
+# Dependencies za export_to_supabase.py
+supabase>=2.0.0

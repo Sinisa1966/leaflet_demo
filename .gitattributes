@@ -1,0 +1,2 @@
+# Shell skripte - obavezno LF (da rade na Linux serveru)
+*.sh text eol=lf

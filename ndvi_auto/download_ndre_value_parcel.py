@@ -4,13 +4,18 @@ from pathlib import Path
 from download_and_publish import (
     build_evalscript_ndre_value,
     compute_output_size,
+    download_index_for_date,
     download_with_fallback,
     geoserver_put,
+    geoserver_request,
     get_env,
+    get_parcel_layer_suffix,
     get_token,
     load_env,
 )
 from download_ndvi_parcel import fetch_parcel_bbox, bbox_to_polygon
+from download_ndvi_parcel_csv import get_latest_date_with_data
+from download_ndre_parcel_csv import build_evalscript_ndre_stats
 
 
 def main() -> None:
@@ -28,9 +33,11 @@ def main() -> None:
     parcel_layer = get_env("PARCEL_LAYER", "VrsacDKP")
     parcel_attr = get_env("PARCEL_ATTR", "brparcele")
     parcel_id = get_env("PARCEL_ID", "25991")
+    kat_opstina = get_env("PARCEL_KAT_OPSTINA", "").strip() or None
 
     minx, miny, maxx, maxy = fetch_parcel_bbox(
-        geoserver_url, workspace, parcel_layer, parcel_attr, parcel_id
+        geoserver_url, workspace, parcel_layer, parcel_attr, parcel_id,
+        kat_opstina=kat_opstina,
     )
     geometry = bbox_to_polygon(minx, miny, maxx, maxy)
     print(f"[INFO] Parcel {parcel_id} bbox: {minx}, {miny}, {maxx}, {maxy}")
@@ -48,25 +55,54 @@ def main() -> None:
     max_pixels = int(get_env("MAX_PIXELS", "4096"))
     width, height = compute_output_size(geometry, resolution_m, max_pixels)
     print(f"[INFO] Output size {width}x{height} (res {resolution_m}m, max {max_pixels}px)")
+    print(f"VALUE_RASTER_WIDTH={width}")
+    print(f"VALUE_RASTER_HEIGHT={height}")
 
     token = get_token(client_id, client_secret)
-    ndre_bytes, ndre_from, ndre_to, ndre_fb = download_with_fallback(
-        token,
-        geometry,
-        days_back,
-        width,
-        height,
-        max_cloud,
-        min_bytes,
-        fallback_days,
-        fallback_cloud,
-        build_evalscript_ndre_value(),
-        f"NDRE_VALUE_PARCEL_{parcel_id}",
-    )
+    parcel_date = get_env("PARCEL_DATE", "").strip()
+    image_criterion = get_env("PARCEL_CRITERION", "").strip()  # iz frontenda ako je prosleđen
+    evalscript = build_evalscript_ndre_value()
+
+    if not parcel_date:
+        # Poslednji datum po kriterijumu (50%+/≥100 px, pa 30%+/≥50 px)
+        parcel_date, image_criterion = get_latest_date_with_data(
+            token, geometry, days_back, max_cloud,
+            evalscript=build_evalscript_ndre_stats(), label="NDRE",
+        )
+        if parcel_date:
+            print(f"[INFO] Korišćen poslednji datum sa podacima: {parcel_date}")
+
+    if parcel_date:
+        ndre_bytes, ndre_from, ndre_to = download_index_for_date(
+            token, geometry, parcel_date, width, height, max_cloud,
+            evalscript, f"NDRE_VALUE_PARCEL_{parcel_id}",
+        )
+        ndre_fb = False
+        if ndre_bytes is None or len(ndre_bytes) < min_bytes:
+            print(f"[WARN] Nema podataka za datum {parcel_date}, koristim mostRecent")
+            ndre_bytes, ndre_from, ndre_to, ndre_fb = download_with_fallback(
+                token, geometry, days_back, width, height,
+                max_cloud, min_bytes, fallback_days, fallback_cloud,
+                evalscript, f"NDRE_VALUE_PARCEL_{parcel_id}",
+            )
+    else:
+        ndre_bytes, ndre_from, ndre_to, ndre_fb = download_with_fallback(
+            token,
+            geometry,
+            days_back,
+            width,
+            height,
+            max_cloud,
+            min_bytes,
+            fallback_days,
+            fallback_cloud,
+            evalscript,
+            f"NDRE_VALUE_PARCEL_{parcel_id}",
+        )
 
     output_dir = Path(get_env("OUTPUT_DIR", str(script_dir / "data")))
     output_dir.mkdir(parents=True, exist_ok=True)
-    safe_parcel_id = parcel_id.replace("/", "_").replace("\\", "_")
+    safe_parcel_id = get_parcel_layer_suffix(parcel_id, kat_opstina)
     output_name = get_env("OUTPUT_FILENAME_NDRE_VALUE_PARCEL", f"ndre_value_parcel_{safe_parcel_id}.tif")
     output_path = output_dir / output_name
     output_path.write_bytes(ndre_bytes)
@@ -75,6 +111,17 @@ def main() -> None:
     store = get_env("GEOSERVER_PARCEL_NDRE_VALUE_STORE", f"ndre_value_parcela_{safe_parcel_id}")
     layer = get_env("GEOSERVER_PARCEL_NDRE_VALUE_LAYER", store)
     style = get_env("GEOSERVER_PARCEL_NDRE_VALUE_STYLE", "raster")
+
+    import urllib.parse
+    zone_style = "ndre_zones_percentile_style"
+    sld_path = script_dir / f"{zone_style}.sld"
+    if sld_path.exists():
+        sld_bytes = sld_path.read_bytes()
+        ws_post = f"{geoserver_url}/rest/workspaces/{workspace}/styles?name={urllib.parse.quote(zone_style)}"
+        st, _ = geoserver_request("POST", ws_post, geoserver_user, geoserver_password, sld_bytes, "application/vnd.ogc.sld+xml")
+        if st not in (200, 201) and st != 409:
+            ws_put = f"{geoserver_url}/rest/workspaces/{workspace}/styles/{zone_style}?raw=true"
+            geoserver_put(ws_put, geoserver_user, geoserver_password, sld_bytes, "application/vnd.ogc.sld+xml")
 
     upload_url = (
         f"{geoserver_url}/rest/workspaces/{workspace}/coveragestores/{store}/file.geotiff?configure=all"
@@ -87,6 +134,10 @@ def main() -> None:
     geoserver_put(style_url, geoserver_user, geoserver_password, style_xml, "text/xml")
     print(f"[INFO] Applied style: {style}")
     print(f"[INFO] NDRE Value date range: {ndre_from} -> {ndre_to} (fallback={ndre_fb})")
+    if ndre_from:
+        print(f"IMAGE_DATE={ndre_from.split('T')[0]}")
+    if image_criterion:
+        print(f"IMAGE_CRITERION={image_criterion}")
 
 
 if __name__ == "__main__":

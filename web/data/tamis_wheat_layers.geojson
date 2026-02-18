@@ -1,0 +1,992 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "site",
+        "name": "Institut Tamiš ogledno polje (point)",
+        "crs": "EPSG:4326",
+        "lat_dd": 44.939388888888885,
+        "lon_dd": 20.722527777777778
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 8,
+        "N": 50,
+        "P": 50,
+        "K": 50,
+        "moisture_pct": 11.7,
+        "yield_kg_ha": 8412,
+        "rank": 16,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 9,
+        "N": 50,
+        "P": 100,
+        "K": 50,
+        "moisture_pct": 11.6,
+        "yield_kg_ha": 9008,
+        "rank": 13,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 10,
+        "N": 50,
+        "P": 100,
+        "K": 100,
+        "moisture_pct": 11.0,
+        "yield_kg_ha": 8859,
+        "rank": 15,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 11,
+        "N": 100,
+        "P": 50,
+        "K": 50,
+        "moisture_pct": 12.0,
+        "yield_kg_ha": 10724,
+        "rank": 11,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 12,
+        "N": 100,
+        "P": 100,
+        "K": 50,
+        "moisture_pct": 11.8,
+        "yield_kg_ha": 11763,
+        "rank": 2,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 13,
+        "N": 100,
+        "P": 100,
+        "K": 100,
+        "moisture_pct": 12.3,
+        "yield_kg_ha": 11421,
+        "rank": 8,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 14,
+        "N": 100,
+        "P": 130,
+        "K": 50,
+        "moisture_pct": 12.0,
+        "yield_kg_ha": 11317,
+        "rank": 9,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 15,
+        "N": 100,
+        "P": 130,
+        "K": 130,
+        "moisture_pct": 12.1,
+        "yield_kg_ha": 11502,
+        "rank": 5,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 16,
+        "N": 130,
+        "P": 50,
+        "K": 50,
+        "moisture_pct": 11.9,
+        "yield_kg_ha": 11180,
+        "rank": 10,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 17,
+        "N": 130,
+        "P": 100,
+        "K": 50,
+        "moisture_pct": 11.9,
+        "yield_kg_ha": 11692,
+        "rank": 4,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 18,
+        "N": 130,
+        "P": 100,
+        "K": 100,
+        "moisture_pct": 11.8,
+        "yield_kg_ha": 11698,
+        "rank": 3,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 19,
+        "N": 130,
+        "P": 130,
+        "K": 100,
+        "moisture_pct": 11.7,
+        "yield_kg_ha": 11455,
+        "rank": 6,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 20,
+        "N": 130,
+        "P": 130,
+        "K": 130,
+        "moisture_pct": 11.2,
+        "yield_kg_ha": 11833,
+        "rank": 1,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 8,
+        "N": 50,
+        "P": 50,
+        "K": 50,
+        "moisture_pct": 16.9,
+        "yield_kg_ha": 8330,
+        "rank": 2,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 9,
+        "N": 50,
+        "P": 100,
+        "K": 50,
+        "moisture_pct": 16.6,
+        "yield_kg_ha": 7887,
+        "rank": 6,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 10,
+        "N": 50,
+        "P": 100,
+        "K": 100,
+        "moisture_pct": 16.4,
+        "yield_kg_ha": 7493,
+        "rank": 10,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 11,
+        "N": 100,
+        "P": 50,
+        "K": 50,
+        "moisture_pct": 15.9,
+        "yield_kg_ha": 7374,
+        "rank": 11,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 12,
+        "N": 100,
+        "P": 100,
+        "K": 50,
+        "moisture_pct": 15.9,
+        "yield_kg_ha": 7306,
+        "rank": 12,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 13,
+        "N": 100,
+        "P": 100,
+        "K": 100,
+        "moisture_pct": 15.4,
+        "yield_kg_ha": 6897,
+        "rank": 17,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 14,
+        "N": 100,
+        "P": 130,
+        "K": 50,
+        "moisture_pct": 15.8,
+        "yield_kg_ha": 7126,
+        "rank": 14,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 15,
+        "N": 100,
+        "P": 130,
+        "K": 130,
+        "moisture_pct": 16.4,
+        "yield_kg_ha": 8467,
+        "rank": 1,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 16,
+        "N": 130,
+        "P": 50,
+        "K": 50,
+        "moisture_pct": 15.5,
+        "yield_kg_ha": 7533,
+        "rank": 9,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 17,
+        "N": 130,
+        "P": 100,
+        "K": 50,
+        "moisture_pct": 15.4,
+        "yield_kg_ha": 6812,
+        "rank": 18,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 18,
+        "N": 130,
+        "P": 100,
+        "K": 100,
+        "moisture_pct": 15.4,
+        "yield_kg_ha": 7026,
+        "rank": 15,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 19,
+        "N": 130,
+        "P": 130,
+        "K": 100,
+        "moisture_pct": 15.6,
+        "yield_kg_ha": 6668,
+        "rank": 19,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 20,
+        "N": 130,
+        "P": 130,
+        "K": 130,
+        "moisture_pct": 15.4,
+        "yield_kg_ha": 6919,
+        "rank": 16,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 8,
+        "N": 50,
+        "P": 50,
+        "K": 50,
+        "moisture_pct": 5.2,
+        "yield_kg_ha": 2629,
+        "rank": 5,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 9,
+        "N": 50,
+        "P": 100,
+        "K": 50,
+        "moisture_pct": 5.1,
+        "yield_kg_ha": 2604,
+        "rank": 6,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 10,
+        "N": 50,
+        "P": 100,
+        "K": 100,
+        "moisture_pct": 5.3,
+        "yield_kg_ha": 2862,
+        "rank": 1,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 11,
+        "N": 100,
+        "P": 50,
+        "K": 50,
+        "moisture_pct": 5.0,
+        "yield_kg_ha": 2360,
+        "rank": 12,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 12,
+        "N": 100,
+        "P": 100,
+        "K": 50,
+        "moisture_pct": 5.1,
+        "yield_kg_ha": 2256,
+        "rank": 19,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 13,
+        "N": 100,
+        "P": 100,
+        "K": 100,
+        "moisture_pct": 5.1,
+        "yield_kg_ha": 2268,
+        "rank": 18,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 14,
+        "N": 100,
+        "P": 130,
+        "K": 50,
+        "moisture_pct": 5.4,
+        "yield_kg_ha": 2316,
+        "rank": 17,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 15,
+        "N": 100,
+        "P": 130,
+        "K": 130,
+        "moisture_pct": 5.1,
+        "yield_kg_ha": 2701,
+        "rank": 3,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 16,
+        "N": 130,
+        "P": 50,
+        "K": 50,
+        "moisture_pct": 5.1,
+        "yield_kg_ha": 2544,
+        "rank": 8,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 17,
+        "N": 130,
+        "P": 100,
+        "K": 50,
+        "moisture_pct": 5.0,
+        "yield_kg_ha": 2669,
+        "rank": 4,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 18,
+        "N": 130,
+        "P": 100,
+        "K": 100,
+        "moisture_pct": 5.0,
+        "yield_kg_ha": 2555,
+        "rank": 7,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 19,
+        "N": 130,
+        "P": 130,
+        "K": 100,
+        "moisture_pct": 5.0,
+        "yield_kg_ha": 2425,
+        "rank": 10,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_npk",
+        "year": 2021,
+        "experiment": "Wheat NPK variants",
+        "idx": 20,
+        "N": 130,
+        "P": 130,
+        "K": 130,
+        "moisture_pct": 5.1,
+        "yield_kg_ha": 2331,
+        "rank": 15,
+        "source_pdf": "REZULTATI-OGLEDA-2021.pdf",
+        "extraction": "embedded-text"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_varieties",
+        "year": 2024,
+        "status": "not_extracted",
+        "reason": "PDF is image-only (scanned); OCR required to extract variety table in this environment.",
+        "source_pdf": "Rezultati-ogleda-2024.pdf"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "wheat_varieties",
+        "year": 2025,
+        "status": "not_extracted",
+        "reason": "PDF is image-only (scanned); OCR required to extract variety table in this environment.",
+        "source_pdf": "Rezultati-ogleda-2025.pdf"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.722527777777778,
+          44.939388888888885
+        ]
+      }
+    }
+  ]
+}

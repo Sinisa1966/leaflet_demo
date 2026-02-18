@@ -1,0 +1,30 @@
+{
+  "type": "FeatureCollection",
+  "name": "NDRE zone parcele 1427/2",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "zone_type": "red", "zone": "Problematična", "ndre_mean": 0.12 },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[21.1986, 44.8142], [21.2021, 44.8142], [21.2021, 44.81553], [21.1986, 44.81553], [21.1986, 44.8142]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "zone_type": "yellow", "zone": "Umerena", "ndre_mean": 0.165 },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[21.1986, 44.81553], [21.2021, 44.81553], [21.2021, 44.81687], [21.1986, 44.81687], [21.1986, 44.81553]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "zone_type": "green", "zone": "Dobra", "ndre_mean": 0.22 },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[21.1986, 44.81687], [21.2021, 44.81687], [21.2021, 44.8182], [21.1986, 44.8182], [21.1986, 44.81687]]]
+      }
+    }
+  ]
+}

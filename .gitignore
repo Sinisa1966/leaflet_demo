@@ -39,6 +39,10 @@ logs/
 *.bak
 *.backup
 
+# Hetzner backup/restore (na serveru)
+backups/
+restore_temp/
+
 # Data files (large CSV, TIFF, etc.)
 # Uncomment if you don't want to commit data files
 # *.csv

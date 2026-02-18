@@ -1,0 +1,30 @@
+{
+  "type": "FeatureCollection",
+  "name": "Parcela 1427/2 - Kovin",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "parcel_id": "1427/2",
+        "cadastral_id": "Kovin_1427_2",
+        "municipality": "Kovin",
+        "area_ha": 0.5,
+        "owner": "Test Owner",
+        "crop_type": "Wheat",
+        "notes": "Test parcela za Kopernikus-GIS Web2 demo"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [21.1986, 44.8142],
+            [21.2021, 44.8142],
+            [21.2021, 44.8182],
+            [21.1986, 44.8182],
+            [21.1986, 44.8142]
+          ]
+        ]
+      }
+    }
+  ]
+}
