@@ -25,7 +25,10 @@ const APP_CONFIG = {
         ndvi: 'moj_projekat:ndvi_parcela_1427_2_DUBOVAC',
         ndmi: 'moj_projekat:ndmi_parcela_1427_2_DUBOVAC',
         ndre: 'moj_projekat:ndre_parcela_1427_2_DUBOVAC',
-        ndreZones: 'moj_projekat:ndre_value_parcela_1427_2_DUBOVAC'
+        ndreZones: 'moj_projekat:ndre_value_parcela_1427_2_DUBOVAC',
+        ndviValue: 'moj_projekat:ndvi_value_parcela_1427_2_DUBOVAC',
+        ndmiValue: 'moj_projekat:ndmi_value_parcela_1427_2_DUBOVAC',
+        ndreValue: 'moj_projekat:ndre_value_parcela_1427_2_DUBOVAC'
     },
 
     // Mapa

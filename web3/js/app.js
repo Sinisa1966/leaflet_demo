@@ -161,19 +161,19 @@ class KopernikausApp {
         const zoneMap = {};
         zones.forEach(z => { zoneMap[z.zone_type] = z.percentage || 0; });
 
-        const redPct    = zoneMap['red']    || 15;
-        const yellowPct = zoneMap['yellow'] || 60;
-        const greenPct  = zoneMap['green']  || 25;
+        const redPct    = zoneMap['red']    || 0;
+        const yellowPct = zoneMap['yellow'] || 0;
+        const greenPct  = zoneMap['green']  || 0;
 
-        const barHTML = `
-            <div class="zone-bar">
-                <div class="zone-segment red"    style="width: ${redPct}%"><span>${redPct}%</span></div>
-                <div class="zone-segment yellow" style="width: ${yellowPct}%"><span>${yellowPct}%</span></div>
-                <div class="zone-segment green"  style="width: ${greenPct}%"><span>${greenPct}%</span></div>
-            </div>`;
-
-        const existing = zoneDistEl.querySelector('.zone-bar');
-        if (existing) existing.outerHTML = barHTML;
+        const setBar = (id, pct) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.style.width = pct + '%';
+            el.querySelector('span').textContent = pct > 5 ? pct + '%' : '';
+        };
+        setBar('zoneRed', redPct);
+        setBar('zoneYellow', yellowPct);
+        setBar('zoneGreen', greenPct);
     }
 
     updateRecommendations(zones) {

@@ -18,7 +18,9 @@ class MapManager {
         this.map         = null;
         this.parcelLayer = null;
         this.zoneLayer   = null;
-        this.indexLayers = {};
+        this.indexLayers  = {};
+        this.wmsBase      = '';
+        this.activeIndex  = 'NDRE';
     }
 
     async init() {
@@ -54,10 +56,11 @@ class MapManager {
             window.location.hostname === '127.0.0.1' ||
             window.location.protocol === 'file:'
         );
-        const wmsBase = (isLocal
+        this.wmsBase = (isLocal
             ? APP_CONFIG.geoserver.local
             : APP_CONFIG.geoserver.production)
             + `/${APP_CONFIG.geoserver.workspace}/wms`;
+        const wmsBase = this.wmsBase;
 
         const wmsOpts = {
             format:      'image/png',
@@ -110,6 +113,7 @@ class MapManager {
         }).addTo(this.map);
 
         this._bindOpacitySliders();
+        this._setupClickHandler();
 
         this.map.whenReady(() => {
             this.loadParcelGeometry({ parcel_id: APP_CONFIG.defaultParcel });
@@ -222,16 +226,10 @@ class MapManager {
                 color:       '#FF0000',
                 weight:      5,
                 opacity:     1,
-                fillColor:   '#FFD700',
-                fillOpacity: 0.25
+                fillColor:   'transparent',
+                fillOpacity: 0
             },
-            onEachFeature: (feature, layer) => {
-                layer.bindPopup(`
-                    <strong>Parcela ${parcelId}</strong><br>
-                    Opština: ${municipality}<br>
-                    Površina: ${areaHa} ha
-                `);
-            }
+            interactive: false
         }).addTo(this.map);
         this.parcelLayer.bringToFront();
 
@@ -360,7 +358,109 @@ class MapManager {
         }));
     }
 
+    _setupClickHandler() {
+        this.map.on('click', async (e) => {
+            const idx = this.activeIndex;
+            const valueLayerMap = {
+                NDVI: APP_CONFIG.wmsLayers.ndviValue,
+                NDMI: APP_CONFIG.wmsLayers.ndmiValue,
+                NDRE: APP_CONFIG.wmsLayers.ndreValue
+            };
+            const valueLayer = valueLayerMap[idx];
+            if (!valueLayer) return;
+
+            const size = this.map.getSize();
+            const bounds = this.map.getBounds();
+            const bbox = [
+                bounds.getSouthWest().lng, bounds.getSouthWest().lat,
+                bounds.getNorthEast().lng, bounds.getNorthEast().lat
+            ].join(',');
+
+            const point = this.map.latLngToContainerPoint(e.latlng);
+            const url = this.wmsBase
+                + '?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo'
+                + '&LAYERS=' + encodeURIComponent(valueLayer)
+                + '&QUERY_LAYERS=' + encodeURIComponent(valueLayer)
+                + '&STYLES=raster'
+                + '&BBOX=' + bbox
+                + '&WIDTH=' + size.x
+                + '&HEIGHT=' + size.y
+                + '&SRS=EPSG:4326'
+                + '&INFO_FORMAT=application/json'
+                + '&X=' + Math.round(point.x)
+                + '&Y=' + Math.round(point.y);
+
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    L.popup().setLatLng(e.latlng)
+                        .setContent(`<strong>${idx}</strong><br>Greška pri čitanju vrednosti`)
+                        .openOn(this.map);
+                    return;
+                }
+                const data = await resp.json();
+                const value = this._extractValue(data);
+                const html = this._buildPopupHtml(idx, value, e.latlng);
+                L.popup().setLatLng(e.latlng).setContent(html).openOn(this.map);
+            } catch (err) {
+                console.warn('GetFeatureInfo greška:', err);
+                L.popup().setLatLng(e.latlng)
+                    .setContent(`<strong>${idx}</strong><br>n/a`)
+                    .openOn(this.map);
+            }
+        });
+    }
+
+    _extractValue(gfiData) {
+        if (!gfiData || !gfiData.features || gfiData.features.length === 0) return null;
+        const props = gfiData.features[0].properties || {};
+        const raw = props.GRAY_INDEX ?? props.gray_index ?? props.BAND_1 ?? props.band_1 ?? null;
+        if (raw === null || raw === undefined) return null;
+        const v = parseFloat(raw);
+        if (isNaN(v) || v === -999 || v === -9999) return null;
+        if (v === 0) return null;
+        return v;
+    }
+
+    _buildPopupHtml(indexType, value, latlng) {
+        const lat = latlng.lat.toFixed(6);
+        const lng = latlng.lng.toFixed(6);
+        if (value === null) {
+            return `<strong>${indexType} Vrednost:</strong> n/a<br>`
+                + `<small style="color:#888">Van rastera ili NoData</small><br>`
+                + `<small style="color:#aaa">${lat}, ${lng}</small>`;
+        }
+        const formatted = value.toFixed(4);
+        let interpretation = '';
+        let color = '#333';
+
+        if (indexType === 'NDVI') {
+            if (value < 0.2)       { interpretation = 'Golo tlo / bez vegetacije'; color = '#8B4513'; }
+            else if (value < 0.4)  { interpretation = 'Slaba vegetacija';          color = '#DAA520'; }
+            else if (value < 0.6)  { interpretation = 'Umerena vegetacija';        color = '#9ACD32'; }
+            else if (value < 0.8)  { interpretation = 'Gusta vegetacija';          color = '#228B22'; }
+            else                   { interpretation = 'Veoma gusta vegetacija';    color = '#006400'; }
+        } else if (indexType === 'NDMI') {
+            if (value < -0.2)      { interpretation = 'Suvo zemljište';            color = '#8B4513'; }
+            else if (value < 0)    { interpretation = 'Niska vlažnost';            color = '#DAA520'; }
+            else if (value < 0.2)  { interpretation = 'Umerena vlažnost';          color = '#4682B4'; }
+            else if (value < 0.4)  { interpretation = 'Visoka vlažnost';           color = '#1E90FF'; }
+            else                   { interpretation = 'Veoma visoka vlažnost';     color = '#0000CD'; }
+        } else if (indexType === 'NDRE') {
+            if (value < 0.14)      { interpretation = 'Problematična zona';        color = '#FF4444'; }
+            else if (value < 0.19) { interpretation = 'Umerena zona';              color = '#DAA520'; }
+            else                   { interpretation = 'Dobra zona';                color = '#44FF44'; }
+        }
+
+        return `<div style="min-width:180px">`
+            + `<strong>${indexType} Vrednost:</strong> <span style="font-size:16px;color:${color}">${formatted}</span><br>`
+            + `<strong>Tumačenje:</strong> <span style="color:${color}">${interpretation}</span><br>`
+            + `<small style="color:#aaa">${lat}, ${lng}</small>`
+            + `</div>`;
+    }
+
     showIndexLayer(indexType) {
+        this.activeIndex = indexType;
         const key = indexType.toLowerCase();
         const opacityMap = { ndvi: 0, ndmi: 0, ndre: 0, ndreZones: 0 };
         opacityMap[key] = 0.7;

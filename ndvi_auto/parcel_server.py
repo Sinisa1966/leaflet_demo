@@ -123,14 +123,50 @@ class ParcelHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        if path not in {"/run", "/csv", "/ndvi_value", "/ndmi", "/ndmi_csv", "/ndmi_value", "/ndre", "/ndre_csv", "/ndre_zones", "/ndre_value", "/value_at_point"}:
+        if path not in {"/run", "/csv", "/ndvi_value", "/ndmi", "/ndmi_csv", "/ndmi_value", "/ndre", "/ndre_csv", "/ndre_zones", "/ndre_value", "/value_at_point", "/zone_stats"}:
             self._send_json(404, {"error": "Not found"})
             return
 
         qs = parse_qs(parsed.query)
         parcel_id = (qs.get("parcel") or [""])[0].strip()
 
-        # value_at_point: lat, lon, date, index – ne zahteva parcel
+        if path == "/zone_stats":
+            kat_opstina = (qs.get("kat_opstina") or [""])[0].strip() or None
+            suffix = _get_parcel_layer_suffix(parcel_id, kat_opstina)
+            data_dir = Path(os.getenv("OUTPUT_DIR", str(SCRIPT_DIR / "data")))
+            raster_path = data_dir / f"ndre_value_parcel_{suffix}.tif"
+            if not raster_path.exists():
+                raster_path = data_dir / f"ndre_value_parcela_{suffix}.tif"
+            if not raster_path.exists():
+                self._send_json(404, {"error": f"NDRE value raster not found: {raster_path.name}"})
+                return
+            try:
+                import rasterio, numpy as np
+                with rasterio.open(str(raster_path)) as ds:
+                    arr = ds.read(1)
+                    nd = ds.nodata if ds.nodata is not None else -999
+                    valid = arr[(arr != nd) & (arr != 0) & np.isfinite(arr)]
+                    total = int(len(valid))
+                    if total == 0:
+                        self._send_json(200, {"ok": True, "total": 0, "red": 0, "yellow": 0, "green": 0})
+                        return
+                    red = int(np.sum(valid < 0.14))
+                    yellow = int(np.sum((valid >= 0.14) & (valid < 0.19)))
+                    green = int(np.sum(valid >= 0.19))
+                    self._send_json(200, {
+                        "ok": True, "total": total,
+                        "red": red, "yellow": yellow, "green": green,
+                        "red_pct": round(red / total * 100, 1),
+                        "yellow_pct": round(yellow / total * 100, 1),
+                        "green_pct": round(green / total * 100, 1),
+                        "mean": round(float(np.mean(valid)), 4),
+                        "min": round(float(np.min(valid)), 4),
+                        "max": round(float(np.max(valid)), 4),
+                    })
+            except Exception as exc:
+                self._send_json(500, {"error": str(exc)})
+            return
+
         if path == "/value_at_point":
             lat_s = (qs.get("lat") or [""])[0].strip()
             lon_s = (qs.get("lon") or [""])[0].strip()

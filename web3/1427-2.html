@@ -138,18 +138,17 @@
                     </div>
                 </div>
                 
-                <div class="zone-distribution" id="zoneDistribution">
-                    <h4>Distribucija Zona:</h4>
+                <div class="zone-distribution" id="zoneDistribution" style="display:none">
+                    <h4>Distribucija Zona (NDRE):</h4>
                     <div class="zone-bar">
-                        <div class="zone-segment red" style="width: 15%">
-                            <span>15%</span>
-                        </div>
-                        <div class="zone-segment yellow" style="width: 60%">
-                            <span>60%</span>
-                        </div>
-                        <div class="zone-segment green" style="width: 25%">
-                            <span>25%</span>
-                        </div>
+                        <div class="zone-segment red" id="zoneRed" style="width: 0%"><span></span></div>
+                        <div class="zone-segment yellow" id="zoneYellow" style="width: 0%"><span></span></div>
+                        <div class="zone-segment green" id="zoneGreen" style="width: 0%"><span></span></div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:11px; color:#888; margin-top:6px;">
+                        <span>Crvena (&lt;0.14)</span>
+                        <span>Žuta (0.14–0.19)</span>
+                        <span>Zelena (≥0.19)</span>
                     </div>
                 </div>
             </div>
@@ -167,27 +166,27 @@
         </div>
 
         <!-- Recommendations Card -->
-        <div class="card recommendations" id="recommendations">
-            <h3>💡 Preporuke za Akciju</h3>
+        <div class="card recommendations" id="recommendations" style="display:none">
+            <h3>Preporuke za Akciju</h3>
             <div class="recommendation-list">
                 <div class="recommendation-item red-zone">
-                    <span class="icon">⚠️</span>
+                    <span class="icon" style="font-size:1.5rem">&#9888;&#65039;</span>
                     <div>
-                        <strong>Crvena Zona (15%):</strong>
+                        <strong>Crvena Zona:</strong>
                         <p>Dodaj više azota. NDRE vrednosti ispod 0.14 ukazuju na deficit azota.</p>
                     </div>
                 </div>
                 <div class="recommendation-item yellow-zone">
-                    <span class="icon">✅</span>
+                    <span class="icon" style="font-size:1.5rem">&#9989;</span>
                     <div>
-                        <strong>Žuta Zona (60%):</strong>
+                        <strong>Žuta Zona:</strong>
                         <p>Standardna obrada. NDRE u optimalnom opsegu 0.14-0.19.</p>
                     </div>
                 </div>
                 <div class="recommendation-item green-zone">
-                    <span class="icon">🌟</span>
+                    <span class="icon" style="font-size:1.5rem">&#11088;</span>
                     <div>
-                        <strong>Zelena Zona (25%):</strong>
+                        <strong>Zelena Zona:</strong>
                         <p>Može manje azota. NDRE ≥ 0.19 pokazuje dobro zdravlje useva.</p>
                     </div>
                 </div>

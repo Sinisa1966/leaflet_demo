@@ -247,40 +247,30 @@ class GeoServerClient {
             .slice(0, limit);
     }
 
-    // Zone klasifikacije – izračunate iz poslednjeg NDRE merenja
     async getZoneClassifications(parcelId, indexType) {
         if (indexType !== 'NDRE') return [];
 
-        const rows  = await this._fetchCsv(parcelId, indexType);
-        const latest = rows
-            .map(r => this._csvRowToResult(r, parcelId, indexType))
-            .filter(r => r !== null)
-            .sort((a, b) => new Date(b.acquisition_date) - new Date(a.acquisition_date))[0];
-        if (!latest) return [];
-
-        const mean = latest.mean_value;
-        const p10  = latest.percentile_10 !== null ? latest.percentile_10 : mean * 0.85;
-        const p90  = latest.percentile_90 !== null ? latest.percentile_90 : mean * 1.15;
-
-        // Procena distribucije zona na osnovu distribucije vrednosti
-        let redPct, yellowPct, greenPct;
-        if (p90 < 0.14) {
-            redPct = 90; yellowPct = 8;  greenPct = 2;
-        } else if (p10 > 0.19) {
-            redPct = 5;  yellowPct = 20; greenPct = 75;
-        } else if (mean < 0.14) {
-            redPct = 60; yellowPct = 30; greenPct = 10;
-        } else if (mean < 0.19) {
-            redPct = 15; yellowPct = 60; greenPct = 25;
-        } else {
-            redPct = 5;  yellowPct = 30; greenPct = 65;
+        try {
+            const params = new URLSearchParams({
+                parcel:      parcelId,
+                layer:       APP_CONFIG.defaultLayer,
+                kat_opstina: APP_CONFIG.defaultKatOpstina
+            });
+            const resp = await fetch(`${this.parcelServerUrl}/zone_stats?${params}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.ok && data.total > 0) {
+                    return [
+                        { zone_type: 'red',    percentage: data.red_pct,    recommendation: 'Dodaj više azota. NDRE ispod 0.14 ukazuje na deficit azota.' },
+                        { zone_type: 'yellow', percentage: data.yellow_pct, recommendation: 'Standardna obrada. NDRE u optimalnom opsegu 0.14–0.19.' },
+                        { zone_type: 'green',  percentage: data.green_pct,  recommendation: 'Može manje azota. NDRE ≥ 0.19 – dobro zdravlje useva.' }
+                    ];
+                }
+            }
+        } catch (e) {
+            console.warn('zone_stats greška:', e.message);
         }
-
-        return [
-            { zone_type: 'red',    percentage: redPct,    acquisition_date: latest.acquisition_date, recommendation: 'Dodaj više azota. NDRE ispod 0.14 ukazuje na deficit azota.' },
-            { zone_type: 'yellow', percentage: yellowPct, acquisition_date: latest.acquisition_date, recommendation: 'Standardna obrada. NDRE u optimalnom opsegu 0.14–0.19.' },
-            { zone_type: 'green',  percentage: greenPct,  acquisition_date: latest.acquisition_date, recommendation: 'Može manje azota. NDRE ≥ 0.19 – dobro zdravlje useva.' }
-        ];
+        return [];
     }
 
     // ─── Refresh rasterskih lejera ────────────────────────────────────────────
