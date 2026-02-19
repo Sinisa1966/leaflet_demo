@@ -1,0 +1,104 @@
+---
+description: Hetzner deployment rules - critical patterns to avoid ALL recurring deployment bugs
+alwaysApply: true
+---
+
+# Hetzner Deployment - Kritična pravila
+
+Server: 89.167.39.148, SSH ključ: ~/.ssh/hetzner_key
+
+## 1. Docker Deploy - NIKAD ne rekreiraj GeoServer ni DB
+
+GeoServer čuva workspace, layere i stilove u Docker volume-u. Ako se kontejner rekreira, SVE se briše.
+
+```bash
+# ✅ ISPRAVNO - rebuild SAMO aplikativnih servisa
+docker compose -f docker-compose.hetzner.yml up -d --build --no-deps parcel_server ndvi_updater
+
+# ❌ NIKAD OVO - rekreira GeoServer, briše workspace/layere/stilove
+docker compose up -d --build
+docker compose -f docker-compose.hetzner.yml up -d --build  # bez --no-deps isto opasno!
+```
+
+UVEK koristiti `docker-compose.hetzner.yml` (ne `docker-compose.yml`).
+UVEK koristiti `--no-deps` da Docker ne rekreira GeoServer/DB kao zavisnost.
+
+## 2. GeoServer Workspace Problem
+
+Ako workspace `moj_projekat` ne postoji (404), treba pokrenuti setup skriptu:
+```bash
+docker exec parcel_server bash /app/scripts/setup_geoserver_hetzner.sh
+```
+Proveriti: `curl -u admin:geoserver http://localhost:8088/geoserver/rest/workspaces/moj_projekat.json`
+
+## 3. Nginx (ndvi_web) - DNS Cache i Proxy Pass
+
+Nginx kešira IP adrese Docker kontejnera. Kad se kontejner rekreira, dobija novi IP → nginx šalje na stari IP → 502 Bad Gateway.
+
+```bash
+# ✅ OBAVEZNO posle svakog rebuilda kontejnera
+docker restart ndvi_web
+```
+
+### Proxy Pass konfiguracija (nginx/conf.d/default.conf)
+
+```nginx
+# ✅ ISPRAVNO - literal URL, nginx pravilno rewrite-uje URI
+location /geoserver/ {
+    proxy_pass http://geoserver:8080/geoserver/;
+}
+
+# ❌ NIKAD - variable u proxy_pass onemogućava URI rewriting → 302 redirect
+set $upstream http://geoserver:8080;
+proxy_pass $upstream/geoserver/;
+```
+
+Resolver direktiva JE potrebna za dynamic DNS:
+```nginx
+resolver 127.0.0.11 valid=10s ipv6=off;
+```
+
+## 4. Port Mapiranje
+
+Na Hetzneru, GeoServer NEMA exposed portove (pristupa se samo interno kroz nginx).
+Nginx (ndvi_web) sluša na portu 8088 (host) → 80 (kontejner).
+Parcel server sluša na portu 5010 (interno), proxy kroz nginx na `/parcel/`.
+
+```
+Korisnik → :8088 → nginx → geoserver:8080 (interno)
+Korisnik → :8088/parcel/ → nginx → parcel_server:5010 (interno)
+```
+
+NIKAD ne dodavati `ports:` za GeoServer u hetzner compose fajlu.
+
+## 5. Nginx Proxy Path za Parcel Server
+
+Na Hetzneru, parcel_server prima zahteve sa `/parcel/` prefiksom.
+Kod u `parcel_server.py` stripuje taj prefiks u `path` promenljivu.
+SVE routing odluke u parcel_server.py moraju koristiti `path`, NIKAD `parsed.path`.
+
+## 6. Value Rasteri - datum je OBAVEZAN
+
+Svi value raster endpointi (`/ndvi_value`, `/ndre_value`, `/ndmi_value`) MORAJU dobiti `&date=YYYY-MM-DD`.
+Bez datuma → 120-dnevni fallback → prosečne vrednosti umesto vrednosti za tačan dan.
+Tok: `ndre_csv` → `LATEST_DATE` → `&date=` na svim value zahtevima.
+
+## 7. Deploy Checklist (OBAVEZNO posle svakog deploya)
+
+```bash
+# 1. Kontejneri rade?
+docker ps --format 'table {{.Names}}\t{{.Status}}'
+
+# 2. GeoServer workspace postoji?
+curl -s -o /dev/null -w "%{http_code}" -u admin:geoserver http://localhost:8088/geoserver/rest/workspaces/moj_projekat.json
+
+# 3. WFS radi (padajući meni)?
+curl -s -o /dev/null -w "%{http_code}" "http://localhost:8088/geoserver/moj_projekat/wfs?service=WFS&version=1.0.0&request=GetCapabilities"
+
+# 4. NDRE CSV koristi pravu skriptu (ne NDMI)?
+curl -s 'http://localhost:8088/parcel/ndre_csv?parcel=1427/2&days=30&cloud=100&layer=kovin_dkp_pg&kat_opstina=DUBOVAC' | head -c 100
+# Mora pisati "NDRE stats", NE "NDMI stats"
+
+# 5. Parcel server logovi - value zahtevi imaju &date=?
+docker logs parcel_server 2>&1 | tail -20 | grep value
+```

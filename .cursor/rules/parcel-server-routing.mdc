@@ -1,0 +1,39 @@
+---
+description: Parcel server routing rules - CRITICAL bug prevention for nginx proxy path stripping
+globs: ndvi_auto/parcel_server.py
+alwaysApply: false
+---
+
+# Parcel Server Routing: UVEK koristi `path`, NIKAD `parsed.path`
+
+## Kontekst
+
+`parcel_server.py` ima logiku za skidanje `/parcel/` prefiksa sa URL-a jer na Hetzner-u nginx proxy šalje zahteve sa `/parcel/` prefiksom (npr. `/parcel/ndre_csv`), dok na localhost-u dolaze direktno (npr. `/ndre_csv`).
+
+Strippovana verzija se čuva u promenljivoj `path`. Originalni URL je u `parsed.path`.
+
+## Pravilo
+
+U svim `if/elif` uslovima za rutiranje endpointa, **OBAVEZNO koristi `path`** (strippovanu verziju), **NIKAD `parsed.path`** (originalnu).
+
+```python
+# ❌ BAG - ne radi na Hetzneru jer parsed.path = "/parcel/ndre_csv"
+elif parsed.path == "/ndre_csv":
+    script_name = "download_ndre_parcel_csv.py"
+
+# ✅ ISPRAVNO - path = "/ndre_csv" i na localhost-u i na Hetzneru
+elif path == "/ndre_csv":
+    script_name = "download_ndre_parcel_csv.py"
+```
+
+## Zašto
+
+- Na localhost-u: `path == parsed.path` (nema proxy-ja) → bag se ne vidi
+- Na Hetzneru: `parsed.path = "/parcel/..."`, `path = "/..."` → bag uzrokuje pad na `else` granu koja pokreće pogrešnu skriptu
+- Posledica: pogrešan CSV → `LATEST_DATE` = null → value rasteri bez datuma → 120-dnevni fallback sa prosečnim vrednostima
+
+## Dodatno
+
+Kada se dodaje novi endpoint u routing blok, proveriti da:
+1. Koristi `path` promenljivu (ne `parsed.path`)
+2. `else` grana na kraju NIKAD ne bi trebalo da bude tihi fallback - treba da loguje upozorenje

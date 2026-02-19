@@ -189,7 +189,7 @@ class ParcelHandler(BaseHTTPRequestHandler):
                 script_name = "download_ndmi_parcel.py"
             elif path == "/ndre":
                 script_name = "download_ndre_parcel.py"
-            elif parsed.path == "/ndre_csv":
+            elif path == "/ndre_csv":
                 script_name = "download_ndre_parcel_csv.py"
             elif path == "/ndmi_csv":
                 script_name = "download_ndmi_parcel_csv.py"
