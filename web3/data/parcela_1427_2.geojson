@@ -1,0 +1,23 @@
+{
+  "type": "FeatureCollection",
+  "name": "Parcela 1427/2 - Kovin (DUBOVAC)",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "parcel_id": "1427/2",
+        "cadastral_id": "Kovin_1427_2",
+        "municipality": "Kovin",
+        "kat_opstina": "DUBOVAC",
+        "area_ha": 4.46,
+        "area_m2": 44605,
+        "crop_type": "Wheat",
+        "notes": "Parcela 1427/2 DUBOVAC - iz DKP katastra"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [[[[21.1992,44.8151],[21.199,44.8154],[21.1989,44.8155],[21.1986,44.8159],[21.1987,44.8162],[21.1987,44.8163],[21.2002,44.8169],[21.202,44.8152],[21.2,44.8142],[21.1996,44.8145],[21.1995,44.8147],[21.1992,44.8151]]]]
+      }
+    }
+  ]
+}

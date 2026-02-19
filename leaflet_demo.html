@@ -3929,7 +3929,7 @@
                 var chartData = filtered.map(function(row) {
                     var date = new Date(row.date);
                     return {
-                        x: date.getTime(), // Koristi timestamp umesto stringa
+                        x: date.getTime(),
                         y: parseFloat(row.mean) || 0
                     };
                 });
@@ -3945,6 +3945,28 @@
                     pointRadius: 2,
                     pointHoverRadius: 4
                 });
+
+                // Median linija (isprekidana, ista boja)
+                var medianData = filtered
+                    .filter(function(row) { return row.median !== null && row.median !== undefined && !isNaN(row.median); })
+                    .map(function(row) {
+                        return { x: new Date(row.date).getTime(), y: parseFloat(row.median) };
+                    });
+
+                if (medianData.length > 0) {
+                    datasets.push({
+                        label: indexName + " (median)",
+                        data: medianData,
+                        borderColor: colors[indexName].border,
+                        backgroundColor: "transparent",
+                        borderWidth: 1.5,
+                        borderDash: [5, 4],
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 3
+                    });
+                }
             });
 
             if (datasets.length === 0) {

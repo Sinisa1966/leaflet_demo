@@ -221,7 +221,7 @@ def stats_to_rows(payload: dict) -> list[dict]:
         date_value = interval.get("from") or ""
         band = pick_output_band(item.get("outputs") or {})
         stats = band.get("stats") or {}
-        percentiles = band.get("percentiles") or {}
+        percentiles = stats.get("percentiles") or band.get("percentiles") or {}
         mean_val = stats.get("mean")
         # Preskoči datume gde su svi pikseli noData (mean je NaN)
         if not _is_valid_number(mean_val):
@@ -234,9 +234,9 @@ def stats_to_rows(payload: dict) -> list[dict]:
             "C0/stDev": stats.get("stDev") or stats.get("stdDev"),
             "C0/sampleCount": stats.get("sampleCount") or band.get("sampleCount"),
             "C0/noDataCount": stats.get("noDataCount") or band.get("noDataCount"),
-            "C0/median": percentiles.get("p50") or percentiles.get("50"),
-            "C0/p10": percentiles.get("p10") or percentiles.get("10"),
-            "C0/p90": percentiles.get("p90") or percentiles.get("90"),
+            "C0/median": percentiles.get("50.0") or percentiles.get("p50") or percentiles.get("50"),
+            "C0/p10": percentiles.get("10.0") or percentiles.get("p10") or percentiles.get("10"),
+            "C0/p90": percentiles.get("90.0") or percentiles.get("p90") or percentiles.get("90"),
             "C0/cloudCoveragePercent": None,
         }
         quality = item.get("qualityIndicators") or {}

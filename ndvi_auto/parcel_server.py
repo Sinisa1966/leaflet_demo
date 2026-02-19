@@ -2,9 +2,24 @@ import json
 import os
 import subprocess
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+# CSV endpointi koji mogu da se keširaju lokalno (max starost u sekundama)
+_CSV_ENDPOINTS = {"/csv", "/ndmi_csv", "/ndre_csv"}
+_CSV_CACHE_SEC = int(os.getenv("PARCEL_CSV_CACHE_SEC", str(6 * 3600)))  # 6 sati
+
+def _csv_path_for_endpoint(path: str, suffix: str, csv_dir: Path) -> Path | None:
+    if path == "/csv":
+        return csv_dir / f"parcela_{suffix}_NDVI.csv"
+    if path == "/ndmi_csv":
+        return csv_dir / f"parcela_{suffix}_NDMI.csv"
+    if path == "/ndre_csv":
+        return csv_dir / f"parcela_{suffix}_NDRE.csv"
+    return None
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -178,6 +193,55 @@ class ParcelHandler(BaseHTTPRequestHandler):
         if "criterion" in qs:
             env["PARCEL_CRITERION"] = (qs.get("criterion") or [""])[0].strip()
 
+        # ── CSV cache: ako fajl postoji i mlađi je od _CSV_CACHE_SEC → servira odmah ──
+        # VAZNO: stdout MORA da sadrzi LATEST_DATE= inace frontend nece proslediti
+        # datum value rasterima i dobicemo 120-dnevni fallback sa pogresnim vrednostima!
+        if path in _CSV_ENDPOINTS:
+            kat_opstina_val = (env.get("PARCEL_KAT_OPSTINA") or "").strip() or None
+            suffix_now = _get_parcel_layer_suffix(parcel_id, kat_opstina_val)
+            csv_dir_now = Path(os.getenv("PARCEL_CSV_DIR", os.getenv("OUTPUT_DIR", str(_get_csv_dir()))))
+            cached_csv = _csv_path_for_endpoint(path, suffix_now, csv_dir_now)
+            if cached_csv and cached_csv.exists():
+                age = time.time() - cached_csv.stat().st_mtime
+                if age < _CSV_CACHE_SEC:
+                    try:
+                        csv_text = cached_csv.read_text(encoding="utf-8")
+                        stdout_lines = [f"[CACHE] Served {cached_csv.name} ({int(age)}s old)"]
+                        import csv as csv_mod, io
+                        reader = csv_mod.DictReader(io.StringIO(csv_text))
+                        rows = list(reader)
+                        if rows:
+                            dates = [r.get("C0/date", "") for r in rows if r.get("C0/date")]
+                            if dates:
+                                latest = max(dates)[:10]
+                                stdout_lines.append(f"LATEST_DATE={latest}")
+                            last = rows[-1] if dates else None
+                            if last:
+                                sc = last.get("C0/sampleCount", "")
+                                ndc = last.get("C0/noDataCount", "")
+                                if sc:
+                                    total = int(float(sc)) + int(float(ndc or 0))
+                                    valid = int(float(sc))
+                                    pct = round(valid / total * 100, 1) if total else 0
+                                    stdout_lines.append(f"LATEST_VALID_PIXELS={valid}")
+                                    stdout_lines.append(f"LATEST_TOTAL_PIXELS={total}")
+                                    stdout_lines.append(f"LATEST_VALID_PCT={pct}")
+                                cloud = last.get("C0/cloudCoveragePercent", "")
+                                if cloud:
+                                    stdout_lines.append(f"LATEST_CLOUD_PCT={cloud}")
+                        self._send_json(200, {
+                            "ok": True,
+                            "parcel": parcel_id,
+                            "cached": True,
+                            "age_sec": int(age),
+                            "stdout": "\n".join(stdout_lines),
+                            "stderr": "",
+                            "csv": csv_text,
+                        })
+                        return
+                    except OSError:
+                        pass
+
         try:
             if path == "/run":
                 script_name = "download_ndvi_parcel.py"
@@ -246,8 +310,13 @@ class ParcelHandler(BaseHTTPRequestHandler):
         self._send_json(200, payload)
 
 
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    """Svaki zahtev se obrađuje u sopstvenom threadu – nema blokiranja."""
+    daemon_threads = True
+
+
 def main() -> None:
-    server = HTTPServer(("0.0.0.0", PORT), ParcelHandler)
+    server = ThreadedHTTPServer(("0.0.0.0", PORT), ParcelHandler)
     print(f"[INFO] Parcel server running on http://localhost:{PORT}")
     print("[INFO] Endpoints: /run /csv /csv_file /ndvi_value /ndmi /ndmi_csv /ndmi_value /ndre /ndre_csv /ndre_zones /ndre_value /value_at_point")
     server.serve_forever()

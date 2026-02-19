@@ -32,8 +32,27 @@ elif path == "/ndre_csv":
 - Na Hetzneru: `parsed.path = "/parcel/..."`, `path = "/..."` → bag uzrokuje pad na `else` granu koja pokreće pogrešnu skriptu
 - Posledica: pogrešan CSV → `LATEST_DATE` = null → value rasteri bez datuma → 120-dnevni fallback sa prosečnim vrednostima
 
+## CSV Cache - OBAVEZNO uključiti LATEST_DATE
+
+CSV endpointi imaju keš mehanizam. Kad se servira iz keša, `stdout` polje u JSON odgovoru
+MORA sadržati `LATEST_DATE=YYYY-MM-DD` (i ostale LATEST_* metapodatke).
+
+Frontend parsira `LATEST_DATE` iz stdout-a i prosleđuje ga value raster endpointima.
+Bez njega → `latestDate = null` → value rasteri bez `&date=` → 120-dnevni fallback.
+
+```python
+# ❌ BAG - stdout bez LATEST_DATE, frontend dobija null datum
+"stdout": f"[CACHE] Served {cached_csv.name} ({int(age)}s old)"
+
+# ✅ ISPRAVNO - rekonstruiši LATEST_DATE iz CSV sadržaja
+stdout_lines = [f"[CACHE] Served {cached_csv.name} ({int(age)}s old)"]
+# ... parsira CSV, nađe max datum ...
+stdout_lines.append(f"LATEST_DATE={latest}")
+```
+
 ## Dodatno
 
-Kada se dodaje novi endpoint u routing blok, proveriti da:
+Kada se dodaje novi endpoint ili menja keš logika, proveriti da:
 1. Koristi `path` promenljivu (ne `parsed.path`)
 2. `else` grana na kraju NIKAD ne bi trebalo da bude tihi fallback - treba da loguje upozorenje
+3. Svaki odgovor koji frontend koristi za ekstrakciju LATEST_DATE MORA ga sadržati u stdout
