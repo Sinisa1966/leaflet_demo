@@ -876,20 +876,20 @@
             return s.replace(/[\u008A\u009A\u008E\u009E\u00C8\u00E8\u00C6\u00E6\u00D0\u00F0]/g, function(c) { return map[c] || c; });
         }
         function parseJsonResponse(response) {
-            return response.text().then(function(txt) {
+            return response.text().then(function(t) {
                 if (!response.ok) {
-                    var hint = (txt && (txt.toLowerCase().indexOf("<!doctype") !== -1 || txt.toLowerCase().indexOf("<html") !== -1))
+                    var hint = (t && (t.toLowerCase().indexOf("<!doctype") !== -1 || t.toLowerCase().indexOf("<html") !== -1))
                         ? " — " + t("error_opstine_run")
                         : "";
                     throw new Error("HTTP " + response.status + hint);
                 }
-                var trim = txt.trim();
+                var trim = t.trim();
                 if (trim.charAt(0) === "<" || trim.indexOf("<?xml") === 0) {
-                    var msg = (txt.indexOf("ServiceException") !== -1) ? (txt.match(/<ServiceException[^>]*>([^<]+)/) || [])[1] : null;
+                    var msg = (t.indexOf("ServiceException") !== -1) ? (t.match(/<ServiceException[^>]*>([^<]+)/) || [])[1] : null;
                     msg = (msg && typeof msg === "string") ? msg.trim() : "";
                     throw new Error(msg || t("error_wfs_xml"));
                 }
-                return JSON.parse(txt);
+                return JSON.parse(t);
             });
         }
         function fetchWfsJson(url) {

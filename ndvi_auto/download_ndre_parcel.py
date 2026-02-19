@@ -59,8 +59,9 @@ def main() -> None:
     parcel_date = get_env("PARCEL_DATE", "").strip()
     evalscript = build_evalscript_ndre()
     if parcel_date:
+        date_cloud = 100
         ndre_bytes, ndre_from, ndre_to = download_index_for_date(
-            token, geometry, parcel_date, width, height, max_cloud,
+            token, geometry, parcel_date, width, height, date_cloud,
             evalscript, f"NDRE_PARCEL_{parcel_id}",
         )
         ndre_fb = False

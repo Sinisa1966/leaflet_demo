@@ -265,11 +265,12 @@ function evaluatePixel(sample) {
 
 def build_evalscript_ndvi_value() -> str:
     """Generiše raster sa sirovim NDVI vrednostima (FLOAT32) za GetFeatureInfo.
-    SCL filter 0,1,8,9 – kao CSV, da vrednosti pri kliku budu u opsegu Min-Max."""
+    Bez SCL filtera — isto kao vizuelni evalscript, jer SCL na malim parcelama
+    često pogrešno klasifikuje sve piksele kao oblak/senku."""
     return """//VERSION=3
 function setup() {
   return {
-    input: ["B04", "B08", "SCL", "dataMask"],
+    input: ["B04", "B08", "dataMask"],
     output: { bands: 1, sampleType: "FLOAT32" }
   };
 }
@@ -277,12 +278,6 @@ function setup() {
 function evaluatePixel(sample) {
   if (sample.dataMask === 0) {
     return [-999];
-  }
-  var scl = sample.SCL;
-  if (scl !== undefined && scl !== null) {
-    if (scl === 0 || scl === 1 || scl === 8 || scl === 9) {
-      return [-999];
-    }
   }
   var sum = sample.B04 + sample.B08;
   if (sum <= 0 || !isFinite(sample.B04) || !isFinite(sample.B08)) {
@@ -549,68 +544,51 @@ function evaluatePixel(sample) {
 
 
 def build_evalscript_ndmi_value() -> str:
-    """Generiše raster sa sirovim NDMI vrednostima (FLOAT32) za GetFeatureInfo."""
+    """Generiše raster sa sirovim NDMI vrednostima (FLOAT32) za GetFeatureInfo.
+    Bez SCL filtera — isto kao vizuelni evalscript."""
     return """//VERSION=3
 function setup() {
   return {
-    input: ["B08", "B11", "SCL", "dataMask"],
-    output: [
-      { id: "default", bands: 1, sampleType: "FLOAT32" },
-      { id: "dataMask", bands: 1 }
-    ]
+    input: ["B08", "B11", "dataMask"],
+    output: { bands: 1, sampleType: "FLOAT32" }
   };
 }
 
 function evaluatePixel(sample) {
   if (sample.dataMask === 0) {
-    return { default: [0], dataMask: [0] };
-  }
-  var scl = sample.SCL;
-  if (scl !== undefined && scl !== null) {
-    if (scl === 0 || scl === 1 || scl === 8 || scl === 9) {
-      return { default: [0], dataMask: [0] };
-    }
+    return [-999];
   }
   var sum = sample.B08 + sample.B11;
   if (sum <= 0 || !isFinite(sample.B08) || !isFinite(sample.B11)) {
-    return { default: [0], dataMask: [0] };
+    return [-999];
   }
   var ndmi = (sample.B08 - sample.B11) / sum;
-  return isFinite(ndmi) ? { default: [ndmi], dataMask: [1] } : { default: [0], dataMask: [0] };
+  return isFinite(ndmi) ? [ndmi] : [-999];
 }
 """
 
 
 def build_evalscript_ndre_value() -> str:
     """Generiše raster sa sirovim NDRE vrednostima (FLOAT32) za GetFeatureInfo.
-    SCL filter kao u CSV – isključi oblake (0,1,8,9) da se ne prikazuju vrednosti vode (-0.06) umesto vegetacije."""
+    Bez SCL filtera — isto kao vizuelni evalscript."""
     return """//VERSION=3
 function setup() {
   return {
-    input: ["B05", "B08", "SCL", "dataMask"],
-    output: [
-      { id: "default", bands: 1, sampleType: "FLOAT32" },
-      { id: "dataMask", bands: 1 }
-    ]
+    input: ["B05", "B08", "dataMask"],
+    output: { bands: 1, sampleType: "FLOAT32" }
   };
 }
 
 function evaluatePixel(sample) {
   if (sample.dataMask === 0) {
-    return { default: [-999], dataMask: [0] };
-  }
-  var scl = sample.SCL;
-  if (scl !== undefined && scl !== null) {
-    if (scl === 0 || scl === 1 || scl === 8 || scl === 9) {
-      return { default: [-999], dataMask: [0] };
-    }
+    return [-999];
   }
   var sum = sample.B08 + sample.B05;
   if (sum <= 0 || !isFinite(sample.B08) || !isFinite(sample.B05)) {
-    return { default: [-999], dataMask: [0] };
+    return [-999];
   }
   var ndre = (sample.B08 - sample.B05) / sum;
-  return isFinite(ndre) ? { default: [ndre], dataMask: [1] } : { default: [-999], dataMask: [0] };
+  return isFinite(ndre) ? [ndre] : [-999];
 }
 """
 

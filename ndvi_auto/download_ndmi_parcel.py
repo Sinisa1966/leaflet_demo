@@ -59,8 +59,9 @@ def main() -> None:
     parcel_date = get_env("PARCEL_DATE", "").strip()
     evalscript = build_evalscript_ndmi()
     if parcel_date:
+        date_cloud = 100
         ndmi_bytes, ndmi_from, ndmi_to = download_index_for_date(
-            token, geometry, parcel_date, width, height, max_cloud,
+            token, geometry, parcel_date, width, height, date_cloud,
             evalscript, f"NDMI_PARCEL_{parcel_id}",
         )
         ndmi_fb = False

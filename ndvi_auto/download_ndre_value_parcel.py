@@ -75,8 +75,9 @@ def main() -> None:
             print(f"[INFO] Korišćen poslednji datum sa podacima: {parcel_date}")
 
     if parcel_date:
+        date_cloud = 100
         ndre_bytes, ndre_from, ndre_to = download_index_for_date(
-            token, geometry, parcel_date, width, height, max_cloud,
+            token, geometry, parcel_date, width, height, date_cloud,
             evalscript, f"NDRE_VALUE_PARCEL_{parcel_id}",
         )
         ndre_fb = False

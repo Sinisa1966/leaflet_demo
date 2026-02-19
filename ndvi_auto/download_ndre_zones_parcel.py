@@ -67,9 +67,10 @@ def main() -> None:
     )
     evalscript_zones = build_evalscript_ndre_zones()
     if parcel_date:
+        date_cloud = 100
         print(f"[INFO] Korišćen poslednji datum sa podacima: {parcel_date}")
         ndre_zones_bytes, ndre_from, ndre_to = download_index_for_date(
-            token, geometry, parcel_date, width, height, max_cloud,
+            token, geometry, parcel_date, width, height, date_cloud,
             evalscript_zones, f"NDRE_ZONES_PARCEL_{parcel_id}",
         )
         ndre_fb = False

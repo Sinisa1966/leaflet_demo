@@ -76,8 +76,9 @@ def main() -> None:
             print(f"[INFO] Korišćen poslednji datum sa podacima: {parcel_date}")
 
     if parcel_date:
+        date_cloud = 100
         ndvi_bytes, ndvi_from, ndvi_to = download_index_for_date(
-            token, geometry, parcel_date, width, height, max_cloud,
+            token, geometry, parcel_date, width, height, date_cloud,
             evalscript, f"NDVI_VALUE_PARCEL_{parcel_id}",
             bbox=utm_bbox, crs=utm_crs,
         )

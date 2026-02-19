@@ -55,6 +55,8 @@ def main() -> None:
     max_pixels = int(get_env("MAX_PIXELS", "4096"))
     width, height = compute_output_size(geometry, resolution_m, max_pixels)
     min_bytes = adaptive_min_bytes(width, height, bands=1, sample_bytes=4)
+    print(f"VALUE_RASTER_WIDTH={width}")
+    print(f"VALUE_RASTER_HEIGHT={height}")
     print(f"[INFO] Output size {width}x{height} (res {resolution_m}m, max {max_pixels}px, min_bytes={min_bytes})")
 
     token = get_token(client_id, client_secret)
@@ -70,8 +72,9 @@ def main() -> None:
             print(f"[INFO] Korišćen poslednji datum sa podacima: {parcel_date}")
 
     if parcel_date:
+        date_cloud = 100
         ndmi_bytes, ndmi_from, ndmi_to = download_index_for_date(
-            token, geometry, parcel_date, width, height, max_cloud,
+            token, geometry, parcel_date, width, height, date_cloud,
             evalscript, f"NDMI_VALUE_PARCEL_{parcel_id}",
         )
         ndmi_fb = False
