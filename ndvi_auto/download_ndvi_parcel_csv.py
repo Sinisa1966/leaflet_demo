@@ -111,8 +111,18 @@ def _geometry_to_utm_bbox(geometry: dict) -> tuple[list, str]:
     return [min(xs), min(ys), max(xs), max(ys)], "http://www.opengis.net/def/crs/EPSG/0/32634"
 
 
+_UTM_CRS = "http://www.opengis.net/def/crs/EPSG/0/32634"
+
+
+def _geometry_to_utm_geom(geometry: dict) -> tuple[dict, str]:
+    """Transformiše GeoJSON geometriju iz EPSG:4326 u UTM 34N, zadržavajući oblik poligona."""
+    from rasterio.warp import transform_geom
+    geom_utm = transform_geom("EPSG:4326", "EPSG:32634", geometry)
+    return geom_utm, _UTM_CRS
+
+
 def post_stats(token: str, geometry: dict, date_from: str, date_to: str, max_cloud: int, res_m: float, evalscript=None, label: str = "NDVI") -> dict:
-    """Poziva Sentinel Hub Statistics API.
+    """Poziva Sentinel Hub Statistics API sa pravom geometrijom parcele (ne bbox).
 
     Parameters
     ----------
@@ -123,10 +133,10 @@ def post_stats(token: str, geometry: dict, date_from: str, date_to: str, max_clo
     """
     if evalscript is None:
         evalscript = build_evalscript_ndvi_stats()
-    bbox, crs = _geometry_to_utm_bbox(geometry)
+    geom_utm, crs = _geometry_to_utm_geom(geometry)
     payload = {
         "input": {
-            "bounds": {"bbox": bbox, "properties": {"crs": crs}},
+            "bounds": {"geometry": geom_utm, "properties": {"crs": crs}},
             "data": [
                 {
                     "type": "sentinel-2-l2a",
@@ -152,7 +162,7 @@ def post_stats(token: str, geometry: dict, date_from: str, date_to: str, max_clo
         },
     }
     data = json.dumps(payload).encode("utf-8")
-    print(f"[DEBUG] {label} Stats API payload - resx: {res_m}m, resy: {res_m}m, bbox: {bbox}")
+    print(f"[DEBUG] {label} Stats API payload - resx: {res_m}m, resy: {res_m}m, geometry type: {geom_utm.get('type')}")
     req = urllib.request.Request(STATS_URL, data=data, method="POST")
     req.add_header("Content-Type", "application/json")
     req.add_header("Authorization", f"Bearer {token}")

@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 from download_and_publish import (
+    adaptive_min_bytes,
     build_evalscript_ndvi_value,
     download_index_for_date,
     download_with_fallback,
@@ -10,8 +11,9 @@ from download_and_publish import (
     get_parcel_layer_suffix,
     get_token,
     load_env,
+    mask_raster_to_parcel,
 )
-from download_ndvi_parcel import fetch_parcel_bbox, bbox_to_polygon
+from download_ndvi_parcel import fetch_parcel_bbox, fetch_parcel_geometry, bbox_to_polygon
 from download_ndvi_parcel_csv import _geometry_to_utm_bbox, get_latest_date_with_data
 
 
@@ -51,15 +53,16 @@ def main() -> None:
 
     days_back = int(get_env("PARCEL_DAYS_BACK", get_env("DAYS_BACK", "30")))
     max_cloud = int(get_env("PARCEL_MAX_CLOUD", get_env("MAX_CLOUD_COVER", "80")))
-    min_bytes = int(get_env("PARCEL_MIN_TIFF_BYTES", get_env("MIN_TIFF_BYTES", "50000")))
     fallback_days = int(
         get_env("PARCEL_FALLBACK_DAYS_BACK", get_env("FALLBACK_DAYS_BACK", "120"))
     )
     fallback_cloud = int(
         get_env("PARCEL_FALLBACK_MAX_CLOUD", get_env("FALLBACK_MAX_CLOUD", "100"))
     )
+    min_bytes = adaptive_min_bytes(width, height, bands=1, sample_bytes=4)
     print(f"VALUE_RASTER_WIDTH={width}")
     print(f"VALUE_RASTER_HEIGHT={height}")
+    print(f"[INFO] min_bytes={min_bytes}")
 
     token = get_token(client_id, client_secret)
     parcel_date = get_env("PARCEL_DATE", "").strip()
@@ -103,6 +106,13 @@ def main() -> None:
             bbox=utm_bbox,
             crs=utm_crs,
         )
+
+    parcel_geom = fetch_parcel_geometry(
+        geoserver_url, workspace, parcel_layer, parcel_attr, parcel_id,
+        kat_opstina=kat_opstina,
+    )
+    if parcel_geom:
+        ndvi_bytes = mask_raster_to_parcel(ndvi_bytes, parcel_geom, nodata=-999)
 
     output_dir = Path(get_env("OUTPUT_DIR", str(script_dir / "data")))
     output_dir.mkdir(parents=True, exist_ok=True)

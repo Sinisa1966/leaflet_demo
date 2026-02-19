@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 from download_and_publish import (
+    adaptive_min_bytes,
     build_evalscript_ndmi_value,
     compute_output_size,
     download_index_for_date,
@@ -11,8 +12,9 @@ from download_and_publish import (
     get_parcel_layer_suffix,
     get_token,
     load_env,
+    mask_raster_to_parcel,
 )
-from download_ndvi_parcel import fetch_parcel_bbox, bbox_to_polygon
+from download_ndvi_parcel import fetch_parcel_bbox, fetch_parcel_geometry, bbox_to_polygon
 from download_ndvi_parcel_csv import get_latest_date_with_data
 from download_ndmi_parcel_csv import build_evalscript_ndmi_stats
 
@@ -43,7 +45,6 @@ def main() -> None:
 
     days_back = int(get_env("PARCEL_DAYS_BACK", get_env("DAYS_BACK", "30")))
     max_cloud = int(get_env("PARCEL_MAX_CLOUD", get_env("MAX_CLOUD_COVER", "80")))
-    min_bytes = int(get_env("PARCEL_MIN_TIFF_BYTES", get_env("MIN_TIFF_BYTES", "50000")))
     fallback_days = int(
         get_env("PARCEL_FALLBACK_DAYS_BACK", get_env("FALLBACK_DAYS_BACK", "120"))
     )
@@ -53,7 +54,8 @@ def main() -> None:
     resolution_m = float(get_env("RESOLUTION_M", "10"))
     max_pixels = int(get_env("MAX_PIXELS", "4096"))
     width, height = compute_output_size(geometry, resolution_m, max_pixels)
-    print(f"[INFO] Output size {width}x{height} (res {resolution_m}m, max {max_pixels}px)")
+    min_bytes = adaptive_min_bytes(width, height, bands=1, sample_bytes=4)
+    print(f"[INFO] Output size {width}x{height} (res {resolution_m}m, max {max_pixels}px, min_bytes={min_bytes})")
 
     token = get_token(client_id, client_secret)
     parcel_date = get_env("PARCEL_DATE", "").strip()
@@ -94,6 +96,13 @@ def main() -> None:
             evalscript,
             f"NDMI_VALUE_PARCEL_{parcel_id}",
         )
+
+    parcel_geom = fetch_parcel_geometry(
+        geoserver_url, workspace, parcel_layer, parcel_attr, parcel_id,
+        kat_opstina=kat_opstina,
+    )
+    if parcel_geom:
+        ndmi_bytes = mask_raster_to_parcel(ndmi_bytes, parcel_geom, nodata=-999)
 
     output_dir = Path(get_env("OUTPUT_DIR", str(script_dir / "data")))
     output_dir.mkdir(parents=True, exist_ok=True)

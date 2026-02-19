@@ -8,6 +8,9 @@ import urllib.parse
 import urllib.request
 
 
+import io
+import tempfile
+
 TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
 PROCESS_URL = "https://sh.dataspace.copernicus.eu/api/v1/process"
 
@@ -105,6 +108,102 @@ def compute_output_size(
     width_px = min(width_px, max_pixels)
     height_px = min(height_px, max_pixels)
     return width_px, height_px
+
+
+def adaptive_min_bytes(width: int, height: int, bands: int = 3, sample_bytes: int = 1, floor: int = 500) -> int:
+    """Izračunava minimalan očekivan broj bajtova GeoTIFF-a na osnovu dimenzija.
+
+    Za male parcele (npr. 100x62 px) fiksni prag od 50000 je prevelik,
+    jer pun nekompresovan raster može biti manji od toga.
+    Vraća ~30% nekompresovane veličine kao prag, ali nikad manje od floor.
+    """
+    raw = width * height * bands * sample_bytes
+    threshold = max(floor, int(raw * 0.3))
+    return threshold
+
+
+def mask_raster_to_parcel(tiff_bytes: bytes, parcel_geojson: dict, nodata=0) -> bytes:
+    """Maskira piksele van granice parcele na nodata.
+
+    Args:
+        tiff_bytes: sirovi GeoTIFF bajti (sa bbox rastera)
+        parcel_geojson: GeoJSON geometry dict parcele (EPSG:4326)
+        nodata: vrednost za piksele van parcele (0 za RGB, -999 za FLOAT32)
+
+    Returns:
+        Maskirani GeoTIFF bajti
+    """
+    try:
+        import numpy as np
+        import rasterio
+        from rasterio.mask import mask as rio_mask
+        from shapely.geometry import shape
+    except ImportError as e:
+        print(f"[WARN] mask_raster_to_parcel: missing dependency ({e}), skipping mask")
+        return tiff_bytes
+
+    try:
+        parcel_shape = shape(parcel_geojson)
+        if parcel_shape.is_empty or not parcel_shape.is_valid:
+            print("[WARN] Invalid parcel geometry, skipping mask")
+            return tiff_bytes
+    except Exception as e:
+        print(f"[WARN] Cannot parse parcel geometry ({e}), skipping mask")
+        return tiff_bytes
+
+    tmp_in = None
+    tmp_out = None
+    try:
+        tmp_in = tempfile.NamedTemporaryFile(suffix=".tif", delete=False)
+        tmp_in.write(tiff_bytes)
+        tmp_in.close()
+
+        with rasterio.open(tmp_in.name) as src:
+            raster_crs = src.crs
+
+            geom_for_mask = parcel_geojson
+            if raster_crs and str(raster_crs) != "EPSG:4326":
+                from pyproj import Transformer
+                from shapely.ops import transform as shp_transform
+                transformer = Transformer.from_crs("EPSG:4326", raster_crs, always_xy=True)
+                parcel_projected = shp_transform(transformer.transform, parcel_shape)
+                geom_for_mask = parcel_projected.__geo_interface__
+
+            out_image, out_transform = rio_mask(
+                src,
+                [geom_for_mask],
+                crop=False,
+                nodata=nodata,
+                filled=True,
+            )
+
+            out_meta = src.meta.copy()
+            out_meta.update({
+                "nodata": nodata,
+                "transform": out_transform,
+            })
+
+        tmp_out = tempfile.NamedTemporaryFile(suffix=".tif", delete=False)
+        tmp_out.close()
+
+        with rasterio.open(tmp_out.name, "w", **out_meta) as dst:
+            dst.write(out_image)
+
+        masked_bytes = Path(tmp_out.name).read_bytes()
+        print(f"[INFO] Raster masked to parcel boundary ({len(tiff_bytes)} -> {len(masked_bytes)} bytes)")
+        return masked_bytes
+
+    except Exception as e:
+        print(f"[WARN] mask_raster_to_parcel failed ({e}), returning original")
+        return tiff_bytes
+    finally:
+        import os as _os
+        if tmp_in:
+            try: _os.unlink(tmp_in.name)
+            except OSError: pass
+        if tmp_out:
+            try: _os.unlink(tmp_out.name)
+            except OSError: pass
 
 
 def build_evalscript_ndvi() -> str:

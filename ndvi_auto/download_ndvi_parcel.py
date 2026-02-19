@@ -5,6 +5,7 @@ import urllib.request
 from pathlib import Path
 
 from download_and_publish import (
+    adaptive_min_bytes,
     build_evalscript_ndvi,
     compute_output_size,
     download_index_for_date,
@@ -14,6 +15,7 @@ from download_and_publish import (
     get_parcel_layer_suffix,
     get_token,
     load_env,
+    mask_raster_to_parcel,
 )
 
 
@@ -72,6 +74,47 @@ def fetch_parcel_bbox(
     raise RuntimeError(f"Parcel {parcel_id} not found in {workspace}:{layer}")
 
 
+def fetch_parcel_geometry(
+    geoserver_url: str,
+    workspace: str,
+    layer: str,
+    parcel_attr: str,
+    parcel_id: str,
+    *,
+    kat_opstina: str | None = None,
+) -> dict | None:
+    """Dohvata stvarnu geometriju parcele (poligon) sa GeoServera WFS.
+
+    Vraća GeoJSON geometry dict ili None ako ne pronađe.
+    """
+    safe_id = parcel_id.replace("'", "''")
+    cql_variants = [f"{parcel_attr}='{safe_id}'"]
+    if kat_opstina and kat_opstina.strip():
+        safe_kat = kat_opstina.strip().replace("'", "''")
+        cql_variants.insert(0, f"{parcel_attr}='{safe_id}' AND kat_opst_1 ILIKE '{safe_kat}'")
+        cql_variants.append(f"{parcel_attr}='{safe_id}' AND ImeKOLatV ILIKE '{safe_kat}'")
+    for cql in cql_variants:
+        params = {
+            "service": "WFS",
+            "version": "1.0.0",
+            "request": "GetFeature",
+            "typeName": f"{workspace}:{layer}",
+            "outputFormat": "application/json",
+            "srsName": "EPSG:4326",
+            "CQL_FILTER": cql,
+        }
+        url = f"{geoserver_url.rstrip('/')}/{workspace}/ows?{urllib.parse.urlencode(params)}"
+        try:
+            with urllib.request.urlopen(url, timeout=60) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except Exception:
+            continue
+        features = data.get("features", [])
+        if features:
+            return features[0]["geometry"]
+    return None
+
+
 def bbox_to_polygon(minx, miny, maxx, maxy) -> dict:
     return {
         "type": "Polygon",
@@ -113,7 +156,6 @@ def main() -> None:
 
     days_back = int(get_env("PARCEL_DAYS_BACK", get_env("DAYS_BACK", "30")))
     max_cloud = int(get_env("PARCEL_MAX_CLOUD", get_env("MAX_CLOUD_COVER", "80")))
-    min_bytes = int(get_env("PARCEL_MIN_TIFF_BYTES", get_env("MIN_TIFF_BYTES", "50000")))
     fallback_days = int(
         get_env("PARCEL_FALLBACK_DAYS_BACK", get_env("FALLBACK_DAYS_BACK", "120"))
     )
@@ -123,7 +165,8 @@ def main() -> None:
     resolution_m = float(get_env("RESOLUTION_M", "10"))
     max_pixels = int(get_env("MAX_PIXELS", "4096"))
     width, height = compute_output_size(geometry, resolution_m, max_pixels)
-    print(f"[INFO] Output size {width}x{height} (res {resolution_m}m, max {max_pixels}px)")
+    min_bytes = adaptive_min_bytes(width, height, bands=3, sample_bytes=1)
+    print(f"[INFO] Output size {width}x{height} (res {resolution_m}m, max {max_pixels}px, min_bytes={min_bytes})")
 
     token = get_token(client_id, client_secret)
     parcel_date = get_env("PARCEL_DATE", "").strip()
@@ -156,7 +199,13 @@ def main() -> None:
             f"NDVI_PARCEL_{parcel_id}",
         )
 
-    # Isto kao NDMI: satelite/ kad nije Docker, inače OUTPUT_DIR ili data
+    parcel_geom = fetch_parcel_geometry(
+        geoserver_url, workspace, parcel_layer, parcel_attr, parcel_id,
+        kat_opstina=kat_opstina,
+    )
+    if parcel_geom:
+        ndvi_bytes = mask_raster_to_parcel(ndvi_bytes, parcel_geom, nodata=0)
+
     if Path("/.dockerenv").exists() and Path("/app/data").exists():
         default_dir = "/app/data"
     else:
